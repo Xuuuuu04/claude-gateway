@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>Claude Gateway Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        claude: {
+                            bg: '#f9f7f2',
+                            card: '#ffffff',
+                            text: '#1d1d19',
+                            muted: '#666660',
+                            accent: '#d97757',
+                            border: '#e5e2d9',
+                            hover: '#f0ede4'
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['"Noto Serif SC"', 'serif'],
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['"Fira Code"', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [v-cloak] { display: none; }
+        body { background-color: #f9f7f2; color: #1d1d19; font-family: 'Inter', sans-serif; }
+        .heading-serif { font-family: 'Noto Serif SC', serif; }
+        .claude-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e2d9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1cdc0; }
+        input, select, textarea { background-color: white !important; }
+    </style>
+</head>
+<body class="min-h-screen">
+<div id="app" v-cloak class="flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-claude-bg border-b border-claude-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-12">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-claude-accent rounded flex items-center justify-center text-white font-serif text-xl">C</div>
+                    <h1 class="text-xl font-serif font-bold tracking-tight">Gateway Admin</h1>
+                </div>
+                <nav v-if="token" class="hidden md:flex items-center space-x-1">
+                    <button v-for="t in tabs" :key="t.key" @click="currentTab = t.key"
+                            :class="['px-4 py-2 rounded-full text-sm font-medium transition-all', 
+                                    currentTab === t.key ? 'bg-claude-text text-white' : 'text-claude-muted hover:bg-claude-hover hover:text-claude-text']">
+                        {{ t.name }}
+                    </button>
+                </nav>
+            </div>
+            <div v-if="token" class="flex items-center space-x-6">
+                <div class="flex items-center space-x-2 text-xs text-claude-muted">
+                    <span :class="['w-2 h-2 rounded-full', status === '已连接' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse']"></span>
+                    <span>{{ status }}</span>
+                </div>
+                <button @click="logout" class="text-sm font-medium text-claude-muted hover:text-claude-accent transition-colors">退出</button>
+            </div>
+        </div>
+    </header>
+
+    <div v-if="toast" class="fixed bottom-6 right-6 z-[200] max-w-md">
+        <div :class="['px-5 py-3 rounded-2xl shadow-lg border text-sm font-medium backdrop-blur',
+                      toast.kind === 'error' ? 'bg-red-50/90 border-red-200 text-red-700' :
+                      toast.kind === 'success' ? 'bg-green-50/90 border-green-200 text-green-700' :
+                      'bg-white/90 border-claude-border text-claude-text']">
+            {{ toast.msg }}
+        </div>
+    </div>
+
+    <!-- Main -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-6 md:p-10">
+        <!-- Login Panel -->
+        <div v-if="!token" class="max-w-md mx-auto mt-20">
+            <div class="bg-claude-card p-10 rounded-2xl border border-claude-border claude-shadow">
+                <h2 class="text-3xl font-serif font-bold mb-2 text-center">欢迎回来</h2>
+                <p class="text-claude-muted text-center mb-8 text-sm">请输入管理员令牌以继续管理您的网关</p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-claude-muted mb-2">Admin Token</label>
+                        <input v-model="loginToken" type="password" placeholder="••••••••" @keyup.enter="saveToken"
+                               class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl focus:ring-2 focus:ring-claude-accent focus:border-claude-accent outline-none transition-all">
+                    </div>
+                    <button @click="saveToken" 
+                            class="w-full bg-claude-text text-white py-3 rounded-xl font-bold hover:opacity-90 active:scale-[0.98] transition-all shadow-sm">
+                        验证并登录
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-else class="space-y-10">
+            <!-- Pools Section -->
+            <section v-if="currentTab === 'pools'" class="animate-fadeIn">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-3xl font-serif font-bold mb-2">渠道池管理</h2>
+                        <p class="text-claude-muted text-sm">管理您的入口 API Key 及其绑定的上游凭据池</p>
+                    </div>
+                    <button @click="editPool()" class="bg-claude-text text-white px-6 py-2.5 rounded-full text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm">
+                        + 创建新池子
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <div v-for="p in pools" :key="p.id" class="bg-claude-card rounded-2xl border border-claude-border claude-shadow hover:border-claude-accent transition-all">
+                        <div class="p-6 md:p-8 flex flex-col lg:flex-row gap-8">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h3 class="text-xl font-serif font-bold hover:text-claude-accent transition-colors cursor-pointer" @click="editPool(p)">{{ p.name }}</h3>
+                                        <div class="mt-2 flex items-center space-x-2">
+                                            <span class="text-[10px] font-mono bg-claude-bg text-claude-muted px-2 py-0.5 rounded border border-claude-border">#{{ p.id }}</span>
+                                            <span :class="['px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase', p.enabled ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200']">
+                                                {{ p.enabled ? 'Active' : 'Disabled' }}
+                                            </span>
+                                            <span class="text-[10px] font-bold text-claude-muted">梯度: {{ getPoolTiers(p).length }}</span>
+                                            <span class="text-[10px] font-bold text-claude-muted">供应商: {{ getPoolProviderIDs(p).length }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <button @click="editPool(p)" class="p-2 text-claude-muted hover:text-claude-text"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                        <button @click="deleteItem('pools', p.id)" class="p-2 text-claude-muted hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-5">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">Client Key</label>
+                                        <div class="flex items-center group/key">
+                                            <code class="text-xs bg-claude-bg text-claude-text px-3 py-2 rounded-lg flex-1 font-mono truncate border border-claude-border">{{ p.client_key }}</code>
+                                            <button @click="copy(p.client_key)" class="ml-2 p-2 text-claude-muted hover:text-claude-accent transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-4 border-t border-claude-border flex justify-between items-center text-sm">
+                                        <div class="flex flex-col">
+                                            <span class="text-[10px] uppercase font-bold text-claude-muted tracking-widest">调度</span>
+                                            <span class="font-medium mt-0.5">梯度智能调度</span>
+                                        </div>
+                                        <div class="flex flex-col items-end">
+                                            <span class="text-[10px] uppercase font-bold text-claude-muted tracking-widest">可用模型</span>
+                                            <span class="font-bold text-claude-accent mt-0.5">{{ getPoolModels(p).length }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="lg:w-[380px] xl:w-[440px] shrink-0 lg:border-l lg:border-claude-border lg:pl-8">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="text-[10px] font-bold text-claude-accent uppercase tracking-widest">模型陈列盘</div>
+                                    <div class="flex items-center gap-3">
+                                        <button @click="copy(getPoolModels(p).join('\\n'))" class="text-[10px] font-bold text-claude-accent hover:underline">复制全部</button>
+                                        <button @click="copy(JSON.stringify(getPoolModels(p)))" class="text-[10px] font-bold text-claude-muted hover:text-claude-text">复制JSON</button>
+                                    </div>
+                                </div>
+                                <div class="relative mb-3">
+                                    <input v-model="poolModelSearch[p.id]" placeholder="搜索模型..." class="w-full px-3 py-2 bg-white border border-claude-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-claude-accent pr-8">
+                                    <div v-if="poolModelSearch[p.id]" @click="poolModelSearch[p.id]=''" class="absolute right-3 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text cursor-pointer">✕</div>
+                                </div>
+                                <div class="flex flex-wrap gap-2 max-h-52 overflow-y-auto custom-scrollbar">
+                                    <button v-for="m in filterPoolModels(p)" :key="m" @click="copy(m)"
+                                            class="px-2 py-1 text-[10px] font-mono bg-white border border-claude-border rounded-lg hover:bg-claude-hover transition-colors truncate max-w-[190px]">
+                                        {{ m }}
+                                    </button>
+                                    <div v-if="!filterPoolModels(p).length" class="text-xs text-claude-muted italic py-6">暂无模型（请先为该池相关供应商拉取 models）</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Providers Section -->
+            <section v-if="currentTab === 'providers'" class="animate-fadeIn">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-3xl font-serif font-bold mb-2">供应商配置</h2>
+                        <p class="text-claude-muted text-sm">配置不同的 AI 模型供应商及其基准端点</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input v-model="providerFilter" placeholder="搜索供应商/分组/类型/URL" class="w-64 px-4 py-2.5 bg-white border border-claude-border rounded-full text-sm outline-none focus:ring-2 focus:ring-claude-accent">
+                        <button @click="editProvider()" class="bg-claude-text text-white px-6 py-2.5 rounded-full text-sm font-bold hover:opacity-90 active:scale-95 transition-all shadow-sm">
+                            + 添加供应商
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-claude-card rounded-2xl border border-claude-border claude-shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-claude-bg/50 border-b border-claude-border">
+                                <th class="px-8 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">分组 / 供应商</th>
+                                <th class="px-8 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">基准端点 (Base URL)</th>
+                                <th class="px-8 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">模型 / 映射</th>
+                                <th class="px-8 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-claude-border">
+                            <template v-for="g in groupedProviders" :key="g.name">
+                                <tr class="bg-claude-bg/40">
+                                    <td class="px-8 py-3 text-xs font-bold text-claude-muted" colspan="4">
+                                        {{ g.name }} <span class="ml-2 text-[10px] font-mono text-claude-muted">({{ g.items.length }})</span>
+                                    </td>
+                                </tr>
+                                <tr v-for="p in g.items" :key="p.id" class="hover:bg-claude-bg/30 transition-colors">
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center space-x-3">
+                                        <div :class="['w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm uppercase', 
+                                                     p.type === 'anthropic' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700']">
+                                            {{ p.type[0] }}
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-sm">{{ p.display_name || p.type }}</div>
+                                            <div class="text-[10px] font-mono text-claude-muted uppercase">ID: {{ p.id }}</div>
+                                            <div class="text-[10px] text-claude-muted mt-0.5">{{ p.group_name || '未分组' }} · {{ p.type }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <code class="text-xs text-claude-muted font-mono truncate max-w-xs block">{{ p.base_url }}</code>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-claude-bg text-claude-text border border-claude-border">
+                                            {{ countModels(p.models_json) }} 模型
+                                        </span>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-claude-bg text-claude-text border border-claude-border">
+                                            {{ countMapItems(p.model_map_json) }} 映射
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6 text-right space-x-2">
+                                    <button @click="manageCredentials(p)" class="text-xs font-bold text-claude-accent hover:underline px-2">凭据</button>
+                                    <button @click="refreshModels(p)" class="text-xs font-bold text-claude-accent hover:underline px-2">拉取模型</button>
+                                    <button @click="batchTestProvider(p)" class="text-xs font-bold text-claude-text hover:underline px-2">测试Key</button>
+                                    <button @click="editProvider(p)" class="text-xs font-bold text-claude-text hover:underline px-2">编辑</button>
+                                    <button @click="deleteItem('providers', p.id)" class="text-xs font-bold text-red-400 hover:text-red-600 px-2">删除</button>
+                                </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Monitoring Section -->
+            <section v-if="currentTab === 'logs'" class="flex flex-col h-[75vh] animate-fadeIn">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-3xl font-serif font-bold mb-2">实时监控</h2>
+                        <p class="text-claude-muted text-sm">查看网关正在处理的请求日志和上游分发详情</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input v-model="logQuery" placeholder="搜索模型/IP/错误/Key尾号" class="w-72 px-4 py-2 bg-white border border-claude-border rounded-full text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                        <label class="flex items-center space-x-2 text-xs text-claude-muted select-none">
+                            <input type="checkbox" v-model="hideTestLogs" class="w-4 h-4 rounded text-claude-accent focus:ring-claude-accent">
+                            <span>隐藏测试</span>
+                        </label>
+                        <button @click="fetchLogs" class="bg-white border border-claude-border text-claude-text px-4 py-2 rounded-full text-xs font-bold hover:bg-claude-hover transition-all">
+                            刷新历史
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-claude-card rounded-2xl border border-claude-border claude-shadow overflow-hidden flex flex-col">
+                    <div class="overflow-x-auto flex-1 custom-scrollbar">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-claude-bg/50 border-b border-claude-border sticky top-0 z-10">
+                                <tr>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">时间</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">池子 / 密钥</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">来源</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">模型 (Req → Up)</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">状态</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">延迟</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">Tokens</th>
+                                    <th class="px-6 py-4 text-[10px] font-bold text-claude-muted uppercase tracking-widest">错误详情</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-claude-border font-sans">
+                                <tr v-for="l in filteredLogs" :key="l.id || l.ts" :class="l.status >= 400 ? 'bg-red-50/30' : 'hover:bg-claude-bg/20'">
+                                    <td class="px-6 py-3 text-xs text-claude-muted whitespace-nowrap">{{ formatTime(l.ts || l.created_at) }}</td>
+                                    <td class="px-6 py-3">
+                                        <div class="font-bold text-claude-text text-xs">{{ getPoolName(l.pool_id) }}</div>
+                                        <div class="text-[10px] font-mono text-claude-muted truncate w-24">...{{ (l.client_key || '').slice(-6) }}</div>
+                                        <div v-if="l.is_test" class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-claude-accent/10 text-claude-accent border border-claude-accent/20">TEST</div>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <div class="text-[10px] font-mono text-claude-text truncate max-w-[140px]">{{ l.src_ip || '-' }}</div>
+                                        <div class="text-[9px] text-claude-muted truncate max-w-[140px]">{{ l.user_agent || '' }}</div>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <div class="flex items-center space-x-2 text-xs">
+                                            <span class="font-medium text-claude-accent">{{ l.request_model || l.model }}</span>
+                                            <span class="text-claude-muted">→</span>
+                                            <span class="font-medium text-claude-muted">{{ l.upstream_model || '-' }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <span :class="['px-2 py-0.5 rounded text-[10px] font-bold border', 
+                                                       l.status < 300 ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                       l.status < 400 ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                                       'bg-red-50 text-red-700 border-red-200']">
+                                            {{ l.status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <span :class="['text-xs font-mono font-medium', l.latency_ms > 1000 ? 'text-orange-500' : 'text-claude-muted']">
+                                            {{ l.latency_ms }}ms
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-3 text-xs font-mono whitespace-nowrap">
+                                        <span v-if="l.input_tokens || l.output_tokens">{{ (l.input_tokens || 0) }}/{{ (l.output_tokens || 0) }} ({{ (l.input_tokens || 0) + (l.output_tokens || 0) }})</span>
+                                        <span v-else class="text-claude-muted">-</span>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <div v-if="l.error" class="text-[10px] text-red-500 font-mono truncate max-w-xs" :title="l.error">{{ l.error }}</div>
+                                        <div v-else class="text-[10px] text-claude-muted">-</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal Backdrop -->
+    <div v-if="modal" class="fixed inset-0 bg-claude-text/40 backdrop-blur-md flex items-start justify-center z-[100] p-6 overflow-y-auto animate-fadeIn">
+        
+        <!-- Pool Modal -->
+        <div v-if="modal === 'pool'" class="bg-claude-card rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-claude-border animate-slideUp">
+            <div class="px-8 py-6 border-b border-claude-border bg-claude-bg/30 flex justify-between items-center">
+                <h3 class="font-serif font-bold text-2xl">{{ form.id ? '编辑渠道池' : '创建新池子' }}</h3>
+                <button @click="modal = null" class="text-claude-muted hover:text-claude-text transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-8 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">名称</label>
+                        <input v-model="form.name" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none focus:ring-2 focus:ring-claude-accent transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">调度策略</label>
+                        <select v-model="form.strategy" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none focus:ring-2 focus:ring-claude-accent transition-all appearance-none cursor-pointer">
+                            <option value="weighted_rr">加权轮询 (Weighted RR)</option>
+                            <option value="least_inflight">最少并发 (Least Inflight)</option>
+                            <option value="priority_failover">优先级故障转移</option>
+                            <option value="round_robin">轮询 (Round Robin)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">Client Key (网关鉴权密钥)</label>
+                    <div class="flex space-x-2">
+                        <input v-model="form.client_key" class="flex-1 px-4 py-2.5 bg-white border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent" placeholder="sk-...">
+                        <button @click="form.client_key = generateKey()" class="px-4 text-xs font-bold text-claude-accent hover:underline">重新生成</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest">梯度调度配置 (Tiered Routing)</label>
+                        <button @click="addTier()" class="text-xs font-bold text-claude-accent hover:underline">+ 添加梯度</button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div v-for="(tier, tIdx) in form._tiers" :key="tIdx" class="bg-claude-bg/20 border border-claude-border rounded-2xl p-5 relative group/tier">
+                            <button @click="removeTier(tIdx)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 opacity-0 group-hover/tier:opacity-100 transition-opacity">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                            
+                            <div class="flex items-center space-x-4 mb-4">
+                                <div class="w-8 h-8 bg-claude-text text-white rounded-full flex items-center justify-center font-bold text-sm">#{{ tIdx }}</div>
+                                <input v-model="tier.name" placeholder="梯度名称 (如: 主力/备用)" class="flex-1 bg-transparent border-b border-claude-border focus:border-claude-accent outline-none text-sm font-bold py-1">
+                                <select v-model="tier.strategy" class="bg-white border border-claude-border rounded-lg px-3 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-claude-accent">
+                                    <option value="weighted_rr">加权轮询</option>
+                                    <option value="priority">按序故障转移</option>
+                                    <option value="random">随机</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                                <div v-for="(item, iIdx) in tier.items" :key="iIdx" class="flex items-center bg-white border border-claude-border rounded-xl p-3 group/item">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-xs font-bold truncate">{{ getProviderName(item.provider_id) }}</div>
+                                        <div class="text-[9px] text-claude-muted truncate">{{ getProviderBaseURL(item.provider_id) }}</div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div v-if="tier.strategy === 'weighted_rr'" class="flex items-center space-x-1">
+                                            <span class="text-[9px] text-claude-muted">W:</span>
+                                            <input type="number" v-model.number="item.weight" class="w-10 px-1 py-0.5 border border-claude-border rounded text-[10px] text-center outline-none">
+                                        </div>
+                                        <button @click="removeProviderFromTier(tIdx, iIdx)" class="text-red-400 hover:text-red-600 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <select @change="e => { if(e.target.value) { addProviderToTier(tIdx, e.target.value); e.target.value = ''; } }" 
+                                        class="w-full px-4 py-2 bg-white border border-dashed border-claude-border rounded-xl text-xs text-claude-muted hover:border-claude-accent transition-all cursor-pointer appearance-none">
+                                    <option value="">+ 添加供应商到此梯度...</option>
+                                    <option v-for="p in providers" :key="p.id" :value="p.id" :disabled="isProviderInTier(tIdx, p.id)">
+                                        {{ p.display_name || p.type }} ({{ p.base_url }})
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-if="!form._tiers || !form._tiers.length" class="text-center py-10 border-2 border-dashed border-claude-border rounded-3xl bg-claude-bg/10">
+                            <div class="text-claude-muted text-xs mb-3">暂无梯度配置，将使用旧版凭据列表。建议点击“添加梯度”开启智能调度。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest">模型映射规则</label>
+                        <div class="inline-flex bg-white border border-claude-border rounded-full overflow-hidden">
+                            <button @click="setMapMode('pool','table')" :class="['px-3 py-1 text-[10px] font-bold', form._poolMapMode !== 'json' ? 'bg-claude-text text-white' : 'text-claude-muted']">表格</button>
+                            <button @click="setMapMode('pool','json')" :class="['px-3 py-1 text-[10px] font-bold', form._poolMapMode === 'json' ? 'bg-claude-text text-white' : 'text-claude-muted']">JSON</button>
+                        </div>
+                    </div>
+                    <div v-if="form._poolMapMode !== 'json'" class="border border-claude-border rounded-2xl overflow-hidden">
+                        <div class="bg-claude-bg/40 px-4 py-2 flex justify-between items-center">
+                            <div class="text-[10px] font-bold text-claude-muted uppercase tracking-widest">请求模型 → 上游模型</div>
+                            <button @click="addMapRow('pool')" class="text-xs font-bold text-claude-accent hover:underline">+ 添加</button>
+                        </div>
+                        <div class="divide-y divide-claude-border bg-white">
+                            <div v-for="(r, idx) in form._poolMapRows" :key="idx" class="p-4 grid grid-cols-12 gap-3 items-center">
+                                <input v-model="r.from" placeholder="例如: gpt-4o" class="col-span-5 px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                                <div class="col-span-1 text-center text-claude-muted">→</div>
+                                <div class="col-span-5">
+                                    <select v-if="getPoolUpstreamModels(form).length" v-model="r.to" class="w-full px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent bg-white">
+                                        <option value="">请选择上游模型</option>
+                                        <option v-for="m in getPoolUpstreamModels(form)" :key="m" :value="m">{{ m }}</option>
+                                    </select>
+                                    <input v-else v-model="r.to" placeholder="例如: claude-3-5-sonnet-latest" class="w-full px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                                </div>
+                                <button @click="removeMapRow('pool', idx)" class="col-span-1 text-red-400 hover:text-red-600 text-xs font-bold">删</button>
+                            </div>
+                            <div v-if="!form._poolMapRows || !form._poolMapRows.length" class="p-6 text-xs text-claude-muted">暂无映射，默认直通请求模型</div>
+                        </div>
+                    </div>
+                    <textarea v-else v-model="form.model_map_json" rows="6" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent" placeholder='{"gpt-4": "claude-3-opus"}'></textarea>
+                </div>
+                <div v-if="getEffectiveMappingsForPool(form).length" class="bg-claude-bg/20 rounded-2xl border border-claude-border p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="text-[10px] font-bold text-claude-muted uppercase tracking-widest">生效映射预览（Provider 默认 + Pool 覆盖）</div>
+                        <div class="text-[10px] font-mono text-claude-muted">{{ getEffectiveMappingsForPool(form).length }} 个供应商</div>
+                    </div>
+                    <div v-for="it in getEffectiveMappingsForPool(form)" :key="it.provider.id" class="bg-white border border-claude-border rounded-2xl p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm font-bold">{{ it.provider.display_name || it.provider.type }}</div>
+                            <div class="text-[10px] font-mono text-claude-muted">{{ it.count }} 项</div>
+                        </div>
+                        <div class="mt-2 text-[10px] font-mono text-claude-muted" v-if="it.count">
+                            <div v-for="k in Object.keys(it.merged).slice(0, 8)" :key="k" class="truncate">
+                                {{ k }} → {{ it.merged[k] }}
+                            </div>
+                            <div v-if="it.count > 8" class="mt-1 text-claude-muted">...{{ it.count - 8 }} 更多</div>
+                        </div>
+                        <div v-else class="mt-2 text-xs text-claude-muted">无映射</div>
+                    </div>
+                </div>
+                <div v-if="form.id" class="bg-claude-bg/30 rounded-2xl border border-claude-border p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="text-[10px] font-bold text-claude-muted uppercase tracking-widest">渠道测试（端到端）</div>
+                        <div v-if="form._poolTest && form._poolTest.result" :class="['text-xs font-bold', form._poolTest.result.ok ? 'text-green-700' : 'text-red-600']">
+                            {{ form._poolTest.result.ok ? '通过' : '失败' }} · {{ form._poolTest.result.status }} · {{ form._poolTest.result.latency_ms }}ms
+                            <span v-if="form._poolTest.result.ttft_ms" class="ml-2 text-orange-600">TTFT: {{ form._poolTest.result.ttft_ms }}ms</span>
+                            <span v-if="form._poolTest.result.tps" class="ml-2 text-green-600">速率: {{ form._poolTest.result.tps.toFixed(1) }} t/s</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">Facade</label>
+                            <select v-model="form._poolTest.facade" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none focus:ring-2 focus:ring-claude-accent appearance-none cursor-pointer">
+                                <option value="openai">OpenAI /v1/chat/completions</option>
+                                <option value="anthropic">Anthropic /v1/messages</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">Model</label>
+                            <input v-model="form._poolTest.model" placeholder="例如: gpt-4o / claude-3-5-sonnet-latest" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none font-mono text-sm focus:ring-2 focus:ring-claude-accent">
+                        </div>
+                    </div>
+                    <button @click="runPoolTest(form)" class="w-full py-3 bg-claude-text text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all shadow-md">
+                        运行测试
+                    </button>
+                    <div v-if="form._poolTest && form._poolTest.result && form._poolTest.result.request_id" class="text-[10px] text-claude-muted font-mono">
+                        Request-Id: {{ form._poolTest.result.request_id }}
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3 p-4 bg-claude-bg/30 rounded-2xl border border-claude-border">
+                    <input type="checkbox" v-model="form.enabled" id="pool-enabled" class="w-5 h-5 rounded text-claude-accent focus:ring-claude-accent cursor-pointer">
+                    <label for="pool-enabled" class="text-sm font-bold cursor-pointer select-none">启用此渠道池</label>
+                </div>
+            </div>
+            <div class="px-8 py-6 bg-claude-bg/30 border-t border-claude-border flex justify-end space-x-4">
+                <button @click="modal = null" class="px-6 py-2.5 text-claude-muted font-bold hover:text-claude-text transition-colors">取消</button>
+                <button @click="savePool" class="px-8 py-2.5 bg-claude-text text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all shadow-md">保存配置</button>
+            </div>
+        </div>
+
+        <!-- Provider Modal -->
+        <div v-if="modal === 'provider'" class="bg-claude-card rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden border border-claude-border animate-slideUp flex flex-col my-6">
+            <div class="px-8 py-6 border-b border-claude-border bg-claude-bg/30 flex justify-between items-center">
+                <h3 class="font-serif font-bold text-2xl">{{ form.id ? '编辑供应商' : '添加新供应商' }}</h3>
+                <button @click="modal = null" class="text-claude-muted hover:text-claude-text transition-colors">✕</button>
+            </div>
+            <div class="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">显示名称</label>
+                        <input v-model="form.display_name" placeholder="例如：硅基主账号" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-claude-accent">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">分组/分类</label>
+                        <input v-model="form.group_name" placeholder="例如：国内/海外/代理" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-claude-accent">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">类型</label>
+                        <select v-model="form.type" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none focus:ring-2 focus:ring-claude-accent appearance-none cursor-pointer">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">状态</label>
+                        <select v-model="form.enabled" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none focus:ring-2 focus:ring-claude-accent appearance-none cursor-pointer">
+                            <option :value="true">启用</option>
+                            <option :value="false">禁用</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">基准端点 (Base URL)</label>
+                    <input v-model="form.base_url" placeholder="https://api.anthropic.com" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl outline-none font-mono text-sm focus:ring-2 focus:ring-claude-accent">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">默认请求头 (JSON)</label>
+                    <textarea v-model="form.default_headers_json" rows="3" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl font-mono text-xs focus:ring-2 focus:ring-claude-accent"></textarea>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest">默认模型映射</label>
+                        <div class="inline-flex bg-white border border-claude-border rounded-full overflow-hidden">
+                            <button @click="setMapMode('provider','table')" :class="['px-3 py-1 text-[10px] font-bold', form._modelMapMode !== 'json' ? 'bg-claude-text text-white' : 'text-claude-muted']">表格</button>
+                            <button @click="setMapMode('provider','json')" :class="['px-3 py-1 text-[10px] font-bold', form._modelMapMode === 'json' ? 'bg-claude-text text-white' : 'text-claude-muted']">JSON</button>
+                        </div>
+                    </div>
+                    <div v-if="form._modelMapMode !== 'json'" class="border border-claude-border rounded-2xl overflow-hidden">
+                        <div class="bg-claude-bg/40 px-4 py-2 flex justify-between items-center">
+                            <div class="text-[10px] font-bold text-claude-muted uppercase tracking-widest">请求模型 → 上游模型</div>
+                            <button @click="addMapRow('provider')" class="text-xs font-bold text-claude-accent hover:underline">+ 添加</button>
+                        </div>
+                        <div class="divide-y divide-claude-border bg-white">
+                            <div v-for="(r, idx) in form._modelMapRows" :key="idx" class="p-4 grid grid-cols-12 gap-3 items-center">
+                                <input v-model="r.from" placeholder="例如: gpt-4o" class="col-span-5 px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                                <div class="col-span-1 text-center text-claude-muted">→</div>
+                                <div class="col-span-5">
+                                    <select v-if="getModelsArray(form.models_json).length" v-model="r.to" class="w-full px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent bg-white">
+                                        <option value="">请选择上游模型</option>
+                                        <option v-for="m in getModelsArray(form.models_json)" :key="m" :value="m">{{ m }}</option>
+                                    </select>
+                                    <input v-else v-model="r.to" placeholder="例如: claude-3-5-sonnet-latest" class="w-full px-3 py-2 border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                                </div>
+                                <button @click="removeMapRow('provider', idx)" class="col-span-1 text-red-400 hover:text-red-600 text-xs font-bold">删</button>
+                            </div>
+                            <div v-if="!form._modelMapRows || !form._modelMapRows.length" class="p-6 text-xs text-claude-muted">暂无映射，默认直通请求模型</div>
+                        </div>
+                    </div>
+                    <textarea v-else v-model="form.model_map_json" rows="6" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl font-mono text-xs focus:ring-2 focus:ring-claude-accent"></textarea>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest">模型列表</label>
+                        <button @click="refreshModels(form)" class="text-xs font-bold text-claude-accent hover:underline">拉取模型</button>
+                    </div>
+                    <div class="bg-claude-bg/30 border border-claude-border rounded-2xl p-4">
+                        <div class="flex items-center justify-between text-xs mb-3">
+                            <div class="text-claude-muted font-mono">已缓存 {{ countModels(form.models_json) }} 个</div>
+                            <div class="relative flex-1 max-w-[200px] ml-4">
+                                <input v-model="form._cachedSearch" placeholder="搜索已缓存模型..." 
+                                       class="w-full px-3 py-1 bg-white border border-claude-border rounded-lg text-[10px] outline-none focus:ring-1 focus:ring-claude-accent/40 pr-6">
+                                <div v-if="form._cachedSearch" @click="form._cachedSearch = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text cursor-pointer text-[10px]">✕</div>
+                            </div>
+                            <div class="text-claude-muted font-mono ml-4" v-if="form.models_refreshed_at">{{ form.models_refreshed_at }}</div>
+                        </div>
+                        <div v-if="getModelsArray(form.models_json).length" class="mt-3 flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                            <div v-for="m in getModelsArray(form.models_json).filter(x => !form._cachedSearch || x.toLowerCase().includes(form._cachedSearch.toLowerCase()))" :key="m" 
+                                 :class="['group/model flex items-center space-x-1 px-2 py-1 rounded-lg border transition-all', 
+                                         modelTestResults[form.id + ':' + m]?.ok === false ? 'bg-red-50 border-red-200 text-red-700' : 
+                                         modelTestResults[form.id + ':' + m]?.ok === true ? 'bg-green-50 border-green-200 text-green-700' : 
+                                         'bg-white border-claude-border']"
+                                 :title="modelTestResults[form.id + ':' + m]?.error || (modelTestResults[form.id + ':' + m]?.ttft_ms ? 'TTFT: ' + modelTestResults[form.id + ':' + m]?.ttft_ms + 'ms, TPS: ' + modelTestResults[form.id + ':' + m]?.tps.toFixed(1) : m)">
+                                <span class="text-[10px] font-mono truncate max-w-[120px]">{{ m }}</span>
+                                <div v-if="modelTestResults[form.id + ':' + m]?.ttft_ms" class="text-[8px] font-bold opacity-60">
+                                    {{ modelTestResults[form.id + ':' + m]?.ttft_ms }}ms / {{ modelTestResults[form.id + ':' + m]?.tps.toFixed(1) }}t/s
+                                </div>
+                                <button @click="testModel(form, m)" class="opacity-0 group-hover/model:opacity-100 hover:text-claude-accent transition-opacity">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </button>
+                                <div v-if="modelTestResults[form.id + ':' + m]?.loading" class="w-2 h-2 rounded-full bg-claude-accent animate-pulse"></div>
+                            </div>
+                        </div>
+                        <div v-else class="mt-2 text-xs text-claude-muted">未拉取到模型。可先录入并测试 Key，再点击“拉取模型”。</div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest">手动填写模型（可选）</label>
+                            <div class="flex items-center gap-3">
+                                <button @click="clearModelsForm()" class="text-xs font-bold text-claude-muted hover:text-claude-text">清空</button>
+                                <button @click="applyManualModelsToForm()" class="text-xs font-bold text-claude-accent hover:underline">应用</button>
+                            </div>
+                        </div>
+                        <textarea v-model="form._modelsManual" rows="4" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl font-mono text-xs focus:ring-2 focus:ring-claude-accent" placeholder="一行一个模型 ID，例如：&#10;gpt-4o&#10;gpt-4.1&#10;claude-3-5-sonnet-latest&#10;&#10;也可直接粘贴 JSON 数组：[&quot;gpt-4o&quot;,&quot;gpt-4.1&quot;]"></textarea>
+                        <div class="mt-1 text-[10px] text-claude-muted">提示：点击“应用”会更新上方下拉选项，点“保存”才会写入数据库。</div>
+                    </div>
+                </div>
+                <div v-if="form._discoveredModels && form._discoveredModels.length" class="bg-claude-accent/5 border border-claude-accent/20 rounded-2xl p-4 animate-fadeIn">
+                    <div class="flex flex-col space-y-3 mb-3">
+                        <div class="flex items-center justify-between">
+                            <div class="text-[10px] font-bold text-claude-accent uppercase tracking-widest">发现新模型 ({{ form._discoveredModels.length }})</div>
+                            <div class="flex space-x-3">
+                                <button @click="form._discoveredModels = null" class="text-[10px] font-bold text-claude-muted hover:text-claude-text">忽略</button>
+                                <button @click="importDiscoveredModels(true)" class="text-[10px] font-bold text-claude-accent hover:underline">全部导入手动列表</button>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <input v-model="form._discoveredSearch" placeholder="搜索模型名称..." 
+                                   class="w-full px-3 py-1.5 bg-white border border-claude-accent/20 rounded-lg text-xs outline-none focus:ring-1 focus:ring-claude-accent/40 pr-8">
+                            <div v-if="form._discoveredSearch" @click="form._discoveredSearch = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-claude-muted hover:text-claude-text cursor-pointer">✕</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        <button v-for="m in (form._discoveredModels || []).filter(x => !form._discoveredSearch || x.toLowerCase().includes(form._discoveredSearch.toLowerCase()))" 
+                                :key="m" @click="importDiscoveredModels(false, m)"
+                                class="px-2 py-1 text-[10px] font-mono bg-white border border-claude-accent/30 rounded-lg hover:bg-claude-accent/10 transition-colors">
+                            + {{ m }}
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">备注</label>
+                    <textarea v-model="form.notes" rows="2" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl text-sm focus:ring-2 focus:ring-claude-accent"></textarea>
+                </div>
+            </div>
+            <div class="px-8 py-6 bg-claude-bg/30 border-t border-claude-border flex justify-end space-x-4">
+                <button @click="modal = null" class="px-6 py-2.5 text-claude-muted font-bold hover:text-claude-text">取消</button>
+                <button @click="saveProvider" class="px-8 py-2.5 bg-claude-text text-white rounded-full font-bold hover:opacity-90 shadow-md">保存</button>
+            </div>
+        </div>
+
+        <!-- Credentials Modal -->
+        <div v-if="modal === 'credentials'" class="bg-claude-card rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden border border-claude-border animate-slideUp">
+            <div class="px-8 py-6 border-b border-claude-border bg-claude-bg/30 flex justify-between items-center">
+                <div>
+                    <h3 class="font-serif font-bold text-2xl">凭据库: {{ activeProvider.type }}</h3>
+                    <p class="text-[10px] text-claude-muted font-mono uppercase mt-1">{{ activeProvider.base_url }}</p>
+                </div>
+                <button @click="modal = null" class="text-claude-muted hover:text-claude-text transition-colors">✕</button>
+            </div>
+            <div class="p-8 flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-8 h-[65vh]">
+                <!-- List -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h4 class="text-[10px] font-bold text-claude-muted uppercase tracking-widest">已录入凭据</h4>
+                        <div class="flex items-center gap-2">
+                            <input v-model="credTestModel" placeholder="测试模型(可选)" class="w-48 px-4 py-2 bg-white border border-claude-border rounded-full text-xs font-mono outline-none focus:ring-2 focus:ring-claude-accent">
+                            <button @click="batchTestProvider(activeProvider)" class="px-4 py-2 bg-white border border-claude-border rounded-full text-xs font-bold hover:bg-claude-hover">批量测试</button>
+                            <button @click="refreshModels(activeProvider)" class="px-4 py-2 bg-white border border-claude-border rounded-full text-xs font-bold hover:bg-claude-hover">拉取模型</button>
+                            <span class="text-[10px] font-bold px-2 py-0.5 bg-claude-bg border border-claude-border rounded-full">{{ activeCredentials.length }}</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto border border-claude-border rounded-2xl divide-y divide-claude-border bg-claude-bg/10 custom-scrollbar">
+                        <div v-for="c in activeCredentials" :key="c.id" 
+                             :class="['p-4 hover:bg-white transition-colors flex justify-between items-center group', 
+                                     c.last_test_ok === false ? 'bg-red-50/50' : '']">
+                            <div class="min-w-0 flex-1 mr-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="font-bold text-sm truncate">{{ c.name }}</div>
+                                    <span v-if="c.last_test_ok === false" class="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse">异常</span>
+                                </div>
+                                <div class="text-[10px] text-claude-muted font-mono mt-1 flex flex-wrap items-center gap-y-1">
+                                    <span class="bg-claude-bg px-1.5 py-0.5 rounded border border-claude-border mr-2">****{{ c.key_last4 }}</span>
+                                    <span class="mr-2">权重: {{ c.weight }}</span>
+                                    <span v-if="c.concurrency_limit > 0" class="mr-2">并发: {{ c.concurrency_limit }}</span>
+                                    <span v-if="c.last_test_at" class="mr-2">测试: {{ formatTime(c.last_test_at) }}</span>
+                                    <span v-if="c.last_test_model" class="mr-2 italic text-claude-accent">({{ c.last_test_model }})</span>
+                                    <span v-if="c.last_test_latency_ms" class="mr-2 text-claude-text">延迟: {{ c.last_test_latency_ms }}ms</span>
+                                    <span v-if="c.last_test_ttft_ms" class="mr-2 text-orange-600 font-bold">TTFT: {{ c.last_test_ttft_ms }}ms</span>
+                                    <span v-if="c.last_test_tps" class="mr-2 text-green-600 font-bold">速率: {{ c.last_test_tps.toFixed(1) }} t/s</span>
+                                </div>
+                                <div v-if="c.last_test_ok === false && c.last_test_error" class="mt-1.5 text-[10px] text-red-500 font-mono bg-red-50 p-1.5 rounded border border-red-100 break-all">
+                                    Error: {{ c.last_test_error }}
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                <span v-if="c.last_test_ok !== undefined && c.last_test_ok !== null" :class="['px-2 py-0.5 rounded text-[10px] font-bold border', c.last_test_ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200']">
+                                    {{ c.last_test_ok ? 'OK' : 'FAIL' }}
+                                </span>
+                                <button @click="testCredential(c)" class="text-xs font-bold text-claude-accent hover:underline">测试</button>
+                                <button @click="editCredential(c)" class="text-xs font-bold text-claude-text hover:underline">编辑</button>
+                                <button @click="deleteItem('credentials', c.id)" class="text-xs font-bold text-red-400 hover:text-red-600">删除</button>
+                            </div>
+                        </div>
+                        <div v-if="!activeCredentials.length" class="h-full flex flex-col items-center justify-center p-10 text-claude-muted opacity-50">
+                            <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                            <p class="text-sm">暂无 API 凭据</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Form -->
+                <div class="w-full md:w-96 space-y-5 bg-claude-bg/50 p-6 rounded-3xl border border-claude-border">
+                    <h4 class="font-serif font-bold text-lg">{{ credForm.id ? '更新凭据信息' : '添加 / 批量导入' }}</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">显示名称</label>
+                            <input v-model="credForm.name" placeholder="例如: 个人主账号-1" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-claude-accent">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">
+                                API Key{{ credForm.id ? '' : '(s)' }} 
+                                <span v-if="!credForm.id" class="normal-case font-normal text-claude-muted ml-1">(一行一个支持批量)</span>
+                            </label>
+                            <textarea v-if="!credForm.id" v-model="credForm.api_key" rows="5" class="w-full px-4 py-3 bg-white border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent" placeholder="sk-ant-...\nsk-ant-..."></textarea>
+                            <input v-else v-model="credForm.api_key" placeholder="留空则不修改 Key" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-claude-accent">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">负载权重</label>
+                                <input v-model.number="credForm.weight" type="number" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-claude-accent">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-claude-muted uppercase tracking-widest mb-2">并发限制</label>
+                                <input v-model.number="credForm.concurrency_limit" type="number" class="w-full px-4 py-2.5 bg-white border border-claude-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-claude-accent" placeholder="0 表示不限">
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3 p-3 bg-white rounded-2xl border border-claude-border">
+                            <input type="checkbox" v-model="autoTestAfterSave" id="auto-test" class="w-4 h-4 rounded text-claude-accent focus:ring-claude-accent cursor-pointer">
+                            <label for="auto-test" class="text-xs font-bold cursor-pointer select-none">保存后自动测试（批量导入后测试全部）</label>
+                        </div>
+                        <div class="pt-2">
+                            <button @click="saveCredential" class="w-full py-3 bg-claude-text text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all shadow-md">
+                                {{ credForm.id ? '保存更改' : (credForm.api_key.includes('\n') ? '批量导入凭据' : '添加凭据') }}
+                            </button>
+                            <button v-if="credForm.id" @click="resetCredForm" class="w-full mt-3 text-xs font-bold text-claude-muted hover:text-claude-text">放弃修改</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted, computed, watch, reactive } = Vue;
+
+createApp({
+    setup() {
+        const token = ref(localStorage.getItem('admin_token') || '');
+        const loginToken = ref('');
+        const currentTab = ref('pools');
+        const tabs = [
+            { key: 'pools', name: '渠道池' },
+            { key: 'providers', name: '供应商' },
+            { key: 'logs', name: '监控面板' }
+        ];
+
+        const pools = ref([]);
+        const providers = ref([]);
+        const credentials = ref([]);
+        const logs = ref([]);
+        const logQuery = ref('');
+        const hideTestLogs = ref(false);
+        const poolModelSearch = reactive({});
+        const status = ref('正在连接...');
+
+        const modal = ref(null);
+        const form = ref({});
+        const activeProvider = ref(null);
+        const activeCredentials = ref([]);
+        const credForm = ref({ weight: 1, concurrency_limit: 0, enabled: true });
+        const providerFilter = ref('');
+        const credTestModel = ref('');
+        const autoTestAfterSave = ref(true);
+        const modelTestResults = ref({});
+        const toast = ref(null);
+        let toastTimer = null;
+
+        // Helper to safely count JSON items (fixes [object Object] SyntaxError)
+        const countMapItems = (val) => {
+            if (!val) return 0;
+            try {
+                const obj = typeof val === 'string' ? JSON.parse(val) : val;
+                return obj ? Object.keys(obj).length : 0;
+            } catch (e) { return 0; }
+        };
+
+        const getModelsArray = (val) => {
+            if (!val) return [];
+            try {
+                const obj = typeof val === 'string' ? JSON.parse(val) : val;
+                if (Array.isArray(obj)) return obj.filter(Boolean).map(x => String(x));
+                return [];
+            } catch (e) { return []; }
+        };
+
+        const countModels = (val) => getModelsArray(val).length;
+
+        const mapToRows = (mapObj) => {
+            if (!mapObj || typeof mapObj !== 'object') return [];
+            return Object.keys(mapObj).sort().map(k => ({ from: k, to: mapObj[k] }));
+        };
+
+        const rowsToMap = (rows) => {
+            const out = {};
+            (rows || []).forEach(r => {
+                const from = (r.from || '').trim();
+                const to = (r.to || '').trim();
+                if (from && to) out[from] = to;
+            });
+            return out;
+        };
+
+        const syncRowsFromJSON = (target) => {
+            try {
+                const obj = JSON.parse(form.value.model_map_json || '{}');
+                if (target === 'provider') form.value._modelMapRows = mapToRows(obj);
+                if (target === 'pool') form.value._poolMapRows = mapToRows(obj);
+            } catch (e) {
+                if (target === 'provider') form.value._modelMapRows = [];
+                if (target === 'pool') form.value._poolMapRows = [];
+            }
+        };
+
+        const syncJSONFromRows = (target) => {
+            const rows = target === 'provider' ? (form.value._modelMapRows || []) : (form.value._poolMapRows || []);
+            form.value.model_map_json = JSON.stringify(rowsToMap(rows), null, 2);
+        };
+
+        const setMapMode = (target, mode) => {
+            if (mode === 'json') syncJSONFromRows(target);
+            if (mode !== 'json') syncRowsFromJSON(target);
+            if (target === 'provider') form.value._modelMapMode = mode;
+            if (target === 'pool') form.value._poolMapMode = mode;
+        };
+
+        const addMapRow = (target) => {
+            if (target === 'provider') form.value._modelMapRows = [...(form.value._modelMapRows || []), { from: '', to: '' }];
+            if (target === 'pool') form.value._poolMapRows = [...(form.value._poolMapRows || []), { from: '', to: '' }];
+        };
+
+        const removeMapRow = (target, idx) => {
+            const rows = target === 'provider' ? (form.value._modelMapRows || []) : (form.value._poolMapRows || []);
+            const next = rows.filter((_, i) => i !== idx);
+            if (target === 'provider') form.value._modelMapRows = next;
+            if (target === 'pool') form.value._poolMapRows = next;
+        };
+
+        const parseModelsManual = (val) => {
+            const txt = (val || '').trim();
+            if (!txt) return [];
+            if (txt.startsWith('[')) {
+                try {
+                    const arr = JSON.parse(txt);
+                    if (Array.isArray(arr)) return arr.map(x => String(x).trim()).filter(Boolean);
+                } catch (e) {}
+            }
+            return txt
+                .split(/[\n,]+/g)
+                .map(s => s.trim())
+                .filter(Boolean);
+        };
+
+        const uniq = (arr) => {
+            const out = [];
+            const seen = new Set();
+            (arr || []).forEach(v => {
+                const s = String(v || '').trim();
+                if (!s || seen.has(s)) return;
+                seen.add(s);
+                out.push(s);
+            });
+            return out;
+        };
+
+        const applyManualModelsToForm = () => {
+            const ids = uniq(parseModelsManual(form.value._modelsManual));
+            form.value.models_json = ids;
+        };
+
+        const clearModelsForm = () => {
+            form.value._modelsManual = '';
+            form.value.models_json = [];
+        };
+
+        const formatStrategy = (s) => {
+            const m = {
+                'weighted_rr': '加权轮询',
+                'least_inflight': '最少并发',
+                'priority_failover': '优先级故障转移',
+                'round_robin': '轮询'
+            };
+            return m[s] || s;
+        };
+
+        const generateKey = () => 'sk-' + Math.random().toString(36).slice(2, 18);
+
+        const notify = (msg, kind = 'info', ms = 2500) => {
+            toast.value = { msg, kind };
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { toast.value = null; }, ms);
+        };
+
+        const api = async (path, opt = {}) => {
+            opt.headers = { 
+                ...opt.headers, 
+                'Authorization': 'Bearer ' + token.value,
+                'Content-Type': 'application/json'
+            };
+            let resp;
+            try {
+                resp = await fetch('/admin/api' + path, opt);
+            } catch (e) {
+                throw (e && e.message) ? e.message : String(e);
+            }
+            if (resp.status === 401) { logout(); throw 'unauthorized'; }
+            if (resp.status === 204) return null;
+            const data = await resp.json();
+            if (!resp.ok) throw data.error || 'API Error';
+            return data;
+        };
+
+        const fetchAll = async () => {
+            if (!token.value) return;
+            try {
+                const [p, pr, cr] = await Promise.all([api('/pools'), api('/providers'), api('/credentials')]);
+                pools.value = p;
+                providers.value = pr;
+                credentials.value = cr;
+                status.value = '已连接';
+            } catch (e) { 
+                console.error(e); 
+                status.value = '连接异常';
+            }
+        };
+
+        const fetchLogs = async () => {
+            try { logs.value = await api('/logs'); } catch(e){}
+        };
+
+        const providersWithCreds = computed(() => {
+            return providers.value.map(p => ({
+                ...p,
+                creds: credentials.value.filter(c => c.provider_id === p.id)
+            }));
+        });
+
+        const filteredLogs = computed(() => {
+            const q = (logQuery.value || '').trim().toLowerCase();
+            return (logs.value || []).filter(l => {
+                if (hideTestLogs.value && l && l.is_test) return false;
+                if (!q) return true;
+                const s = [
+                    l.request_model, l.upstream_model, l.error, l.src_ip, l.user_agent,
+                    l.client_key ? String(l.client_key).slice(-12) : '',
+                    l.pool_id, l.credential_id, l.provider_id
+                ].filter(Boolean).join(' ').toLowerCase();
+                return s.includes(q);
+            });
+        });
+
+        const groupedProviders = computed(() => {
+            const q = (providerFilter.value || '').trim().toLowerCase();
+            const items = providers.value.filter(p => {
+                if (!q) return true;
+                const s = [
+                    p.display_name, p.group_name, p.type, p.base_url
+                ].filter(Boolean).join(' ').toLowerCase();
+                return s.includes(q);
+            });
+            const groups = {};
+            items.forEach(p => {
+                const name = (p.group_name || '').trim() || '未分组';
+                groups[name] = groups[name] || [];
+                groups[name].push(p);
+            });
+            return Object.keys(groups).sort().map(name => ({
+                name,
+                items: groups[name].sort((a, b) => String(a.display_name || a.type).localeCompare(String(b.display_name || b.type)))
+            }));
+        });
+
+        // SSE for real-time logs
+        let es = null;
+        const startSSE = () => {
+            if (es) es.close();
+            es = new EventSource('/admin/api/logs/stream?token=' + token.value);
+            es.onmessage = (e) => {
+                const ev = JSON.parse(e.data);
+                logs.value.unshift(ev);
+                if (logs.value.length > 200) logs.value.pop();
+            };
+            es.onerror = () => { status.value = '重连中...'; };
+            es.onopen = () => { status.value = '实时监控中'; };
+        };
+
+        // Pool Management
+        const editPool = (p) => {
+            form.value = p ? JSON.parse(JSON.stringify(p)) : { name: '', client_key: generateKey(), strategy: 'round_robin', tiers_json: null, credential_ids: [], model_map_json: '{}', enabled: true };
+            if (typeof form.value.model_map_json !== 'string') form.value.model_map_json = JSON.stringify(form.value.model_map_json || {}, null, 2);
+            form.value._poolMapMode = 'table';
+            form.value._poolMapRows = [];
+            form.value._poolTest = { facade: 'openai', model: '', result: null };
+            form.value._tiers = form.value.tiers_json ? (typeof form.value.tiers_json === 'string' ? JSON.parse(form.value.tiers_json) : form.value.tiers_json) : [];
+            syncRowsFromJSON('pool');
+            modal.value = 'pool';
+        };
+        const savePool = async () => {
+            try {
+                if (form.value._poolMapMode !== 'json') syncJSONFromRows('pool');
+                const body = { ...form.value, model_map_json: JSON.parse(form.value.model_map_json || '{}') };
+                body.tiers_json = form.value._tiers || [];
+                delete body._poolMapMode; delete body._poolMapRows; delete body._poolTest; delete body._tiers;
+                const method = body.id ? 'PUT' : 'POST';
+                const url = body.id ? '/pools/' + body.id : '/pools';
+                await api(url, { method, body: JSON.stringify(body) });
+                modal.value = null; fetchAll();
+            } catch(e) { alert('保存失败: ' + e); }
+        };
+
+        const addTier = () => {
+            if (!form.value._tiers) form.value._tiers = [];
+            form.value._tiers.push({ name: '新梯度', strategy: 'weighted_rr', items: [] });
+        };
+        const removeTier = (idx) => {
+            form.value._tiers.splice(idx, 1);
+        };
+        const addProviderToTier = (tIdx, pId) => {
+            pId = Number(pId);
+            if (!form.value._tiers[tIdx].items) form.value._tiers[tIdx].items = [];
+            if (form.value._tiers[tIdx].items.some(it => it.provider_id === pId)) return;
+            form.value._tiers[tIdx].items.push({ provider_id: pId, weight: 10 });
+        };
+        const removeProviderFromTier = (tIdx, iIdx) => {
+            form.value._tiers[tIdx].items.splice(iIdx, 1);
+        };
+        const isProviderInTier = (tIdx, pId) => {
+            return (form.value._tiers[tIdx]?.items || []).some(it => it.provider_id === pId);
+        };
+        const getProviderName = (id) => {
+            const p = providers.value.find(x => x.id === id);
+            return p ? (p.display_name || p.type) : '未知';
+        };
+        const getProviderBaseURL = (id) => {
+            const p = providers.value.find(x => x.id === id);
+            return p ? p.base_url : '';
+        };
+
+        // Provider Management
+        const editProvider = (p) => {
+            form.value = p ? JSON.parse(JSON.stringify(p)) : { type: 'openai', display_name: '', group_name: '', base_url: '', default_headers_json: '{}', model_map_json: '{}', notes: '', enabled: true };
+            ['default_headers_json', 'model_map_json'].forEach(k => {
+                if (typeof form.value[k] !== 'string') form.value[k] = JSON.stringify(form.value[k] || {}, null, 2);
+            });
+            form.value._modelMapMode = 'table';
+            form.value._modelMapRows = [];
+            syncRowsFromJSON('provider');
+            form.value._modelsManual = getModelsArray(form.value.models_json).join('\n');
+            modal.value = 'provider';
+        };
+        const saveProvider = async () => {
+            try {
+                if (form.value._modelMapMode !== 'json') syncJSONFromRows('provider');
+                const body = { ...form.value };
+                ['default_headers_json', 'model_map_json'].forEach(k => { body[k] = JSON.parse(body[k] || '{}'); });
+                delete body._modelMapMode; delete body._modelMapRows; delete body._modelsManual;
+                const method = body.id ? 'PUT' : 'POST';
+                const url = body.id ? '/providers/' + body.id : '/providers';
+                await api(url, { method, body: JSON.stringify(body) });
+                modal.value = null; fetchAll();
+            } catch(e) { alert('保存失败: ' + e); }
+        };
+
+        const refreshModels = async (p) => {
+            try {
+                if (!p || !p.id) { alert('请先保存供应商'); return; }
+                notify('拉取模型中…');
+                const res = await api('/providers/' + p.id + '/models/refresh', { method: 'POST', body: JSON.stringify({}) });
+                
+                // Update local form immediately
+                if (res && res.models_json) {
+                    form.value.models_json = res.models_json;
+                    form.value.models_refreshed_at = res.models_refreshed_at;
+                    
+                    // Show discovered list to let user pick or import all
+                    form.value._discoveredModels = res.models || [];
+                    notify('成功发现 ' + (res.models || []).length + ' 个模型', 'success');
+                }
+
+                await fetchAll();
+            } catch (e) { notify('拉取模型失败：' + e, 'error', 4000); }
+        };
+
+        const importDiscoveredModels = (all = true, m = null) => {
+            let current = parseModelsManual(form.value._modelsManual);
+            if (all) {
+                current = uniq([...current, ...(form.value._discoveredModels || [])]);
+            } else if (m) {
+                current = uniq([...current, m]);
+            }
+            form.value._modelsManual = current.join('\n');
+            notify('已添加到手动填写列表，点击“应用”生效', 'success');
+        };
+
+        const batchTestProvider = async (p) => {
+            try {
+                if (!p || !p.id) { alert('请先保存供应商'); return; }
+                notify('测试 Key 中…');
+                const res = await api('/providers/' + p.id + '/credentials/test', { method: 'POST', body: JSON.stringify({}) });
+                const cr = await api('/credentials');
+                credentials.value = cr;
+                if (activeProvider.value && activeProvider.value.id === p.id) {
+                    activeCredentials.value = credentials.value.filter(c => c.provider_id === p.id);
+                }
+                if (res && typeof res.count === 'number' && res.count === 0) {
+                    notify('该供应商暂无启用的 Key，请先点“凭据”录入', 'error', 3500);
+                    return;
+                }
+                if (res && typeof res.ok === 'number' && typeof res.fail === 'number') {
+                    notify('测试完成：成功 ' + res.ok + '，失败 ' + res.fail, res.fail ? 'error' : 'success', 3500);
+                } else {
+                    notify('测试完成', 'success');
+                }
+            } catch (e) { notify('批量测试失败：' + e, 'error', 4000); }
+        };
+
+        const testModel = async (p, model) => {
+            const key = p.id + ':' + model;
+            modelTestResults.value[key] = { loading: true };
+            try {
+                const creds = credentials.value.filter(c => c.provider_id === p.id && c.enabled);
+                if (!creds.length) {
+                    notify('无可用的启用凭据来测试该模型', 'error');
+                    modelTestResults.value[key] = { ok: false, error: '无可用凭据' };
+                    return;
+                }
+                const res = await api('/credentials/' + creds[0].id + '/test', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ model }) 
+                });
+                modelTestResults.value[key] = { 
+                    loading: false, 
+                    ok: res.ok, 
+                    ttft_ms: res.ttft_ms,
+                    tps: res.tps,
+                    error: res.ok ? '' : (res.error || '测试失败 (' + res.status + ')')
+                };
+                if (!res.ok) {
+                    notify('模型 ' + model + ' 测试失败: ' + (res.error || '状态码 ' + res.status), 'error', 5000);
+                } else {
+                    notify('模型 ' + model + ' 测试通过', 'success');
+                }
+            } catch (e) {
+                modelTestResults.value[key] = { loading: false, ok: false, error: String(e) };
+                notify('模型测试异常: ' + e, 'error');
+            }
+        };
+
+        const testCredential = async (c) => {
+            try {
+                notify('测试中…');
+                const res = await api('/credentials/' + c.id + '/test', { method: 'POST', body: JSON.stringify({ model: credTestModel.value }) });
+                const cr = await api('/credentials');
+                credentials.value = cr;
+                if (activeProvider.value) {
+                    activeCredentials.value = credentials.value.filter(x => x.provider_id === activeProvider.value.id);
+                }
+                if (res.ok) {
+                    notify('测试完成', 'success');
+                } else {
+                    notify('测试失败: ' + (res.error || '状态码 ' + res.status), 'error', 5000);
+                }
+            } catch (e) { notify('测试失败：' + e, 'error', 4000); }
+        };
+
+        const getPoolUpstreamModels = (poolForm) => {
+            const ids = (poolForm.credential_ids || []).map(Number);
+            const providerIDs = new Set(ids.map(id => credentials.value.find(c => c.id === id)?.provider_id).filter(Boolean));
+            const out = new Set();
+            providers.value.forEach(p => {
+                if (!providerIDs.has(p.id)) return;
+                getModelsArray(p.models_json).forEach(m => out.add(m));
+            });
+            return Array.from(out).sort();
+        };
+
+        const parseMap = (val) => {
+            if (!val) return {};
+            try {
+                if (typeof val === 'string') {
+                    const obj = JSON.parse(val || '{}');
+                    return obj && typeof obj === 'object' ? obj : {};
+                }
+                return val && typeof val === 'object' ? val : {};
+            } catch (e) { return {}; }
+        };
+
+        const getEffectiveMappingsForPool = (poolForm) => {
+            const poolMap = poolForm && poolForm._poolMapMode !== 'json' ? rowsToMap(poolForm._poolMapRows || []) : parseMap(poolForm?.model_map_json);
+            const ids = (poolForm?.credential_ids || []).map(Number);
+            const providerIDs = new Set(ids.map(id => credentials.value.find(c => c.id === id)?.provider_id).filter(Boolean));
+            const list = providers.value.filter(p => providerIDs.has(p.id)).map(p => {
+                const providerMap = parseMap(p.model_map_json);
+                const merged = { ...providerMap, ...poolMap };
+                const count = Object.keys(merged).length;
+                return { provider: p, merged, count };
+            });
+            return list.sort((a, b) => String(a.provider.display_name || a.provider.type).localeCompare(String(b.provider.display_name || b.provider.type)));
+        };
+
+        const runPoolTest = async (poolForm) => {
+            if (!poolForm.id) return;
+            try {
+                notify('渠道测试中…');
+                const res = await api('/pools/' + poolForm.id + '/test', { method: 'POST', body: JSON.stringify({ facade: poolForm._poolTest.facade, model: poolForm._poolTest.model }) });
+                poolForm._poolTest.result = res;
+                notify(res && res.ok ? '渠道测试通过' : '渠道测试失败', res && res.ok ? 'success' : 'error', 3500);
+            } catch (e) { notify('渠道测试失败：' + e, 'error', 4000); }
+        };
+
+        // Credentials Management
+        const manageCredentials = async (p) => {
+            activeProvider.value = p;
+            activeCredentials.value = credentials.value.filter(c => c.provider_id === p.id);
+            resetCredForm();
+            modal.value = 'credentials';
+        };
+        const resetCredForm = () => {
+            credForm.value = { provider_id: activeProvider.value.id, weight: 1, concurrency_limit: 0, enabled: true, name: '', api_key: '' };
+        };
+        const editCredential = (c) => {
+            credForm.value = JSON.parse(JSON.stringify(c));
+            credForm.value.api_key = ''; // Never show old key
+        };
+        const saveCredential = async () => {
+            try {
+                if (!credForm.value.id && credForm.value.api_key.includes('\n')) {
+                    const keys = credForm.value.api_key.split('\n').map(k => k.trim()).filter(k => k);
+                    const items = keys.map((k, i) => ({
+                        name: credForm.value.name ? (credForm.value.name + '-' + (i+1)) : (activeProvider.value.type + '-' + (i+1)),
+                        api_key: k,
+                        weight: credForm.value.weight,
+                        concurrency_limit: credForm.value.concurrency_limit,
+                        enabled: true
+                    }));
+                    await api('/credentials/bulk', { method: 'POST', body: JSON.stringify({ provider_id: activeProvider.value.id, items }) });
+                } else {
+                    const method = credForm.value.id ? 'PUT' : 'POST';
+                    const url = credForm.value.id ? '/credentials/' + credForm.value.id : '/credentials';
+                    await api(url, { method, body: JSON.stringify(credForm.value) });
+                }
+                const cr = await api('/credentials'); 
+                credentials.value = cr;
+                activeCredentials.value = credentials.value.filter(c => c.provider_id === activeProvider.value.id);
+                resetCredForm();
+                if (autoTestAfterSave.value && activeProvider.value) {
+                    batchTestProvider(activeProvider.value);
+                }
+            } catch(e) { alert('保存失败: ' + e); }
+        };
+
+        const deleteItem = async (type, id) => {
+            if (!confirm('此操作不可逆，确定要删除吗?')) return;
+            try {
+                notify('删除中…');
+                await api('/' + type + '/' + id, { method: 'DELETE' });
+                fetchAll();
+                if (type === 'credentials' && activeProvider.value) {
+                    activeCredentials.value = activeCredentials.value.filter(c => c.id !== id);
+                }
+                notify('已删除', 'success');
+            } catch(e) { notify('删除失败：' + e, 'error', 4000); }
+        };
+
+        const saveToken = () => {
+            let t = loginToken.value.trim();
+            if (t.startsWith('Bearer ')) t = t.substring(7).trim();
+            if (!t) return;
+            token.value = t; 
+            localStorage.setItem('admin_token', token.value); 
+            fetchAll(); 
+        };
+        const logout = () => { token.value = ''; localStorage.removeItem('admin_token'); if(es) es.close(); };
+        const copy = (txt) => { 
+            navigator.clipboard.writeText(txt); 
+            // Minimal toast/alert could be added here
+        };
+        const formatTime = (ts) => {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            return d.getHours().toString().padStart(2, '0') + ':' + 
+                   d.getMinutes().toString().padStart(2, '0') + ':' + 
+                   d.getSeconds().toString().padStart(2, '0');
+        };
+        const getPoolName = (id) => pools.value.find(p => p.id === id)?.name || ('池 #' + id);
+
+        const getPoolTiers = (p) => {
+            const raw = p ? (p._tiers ?? p.tiers_json ?? p.tiersJSON) : null;
+            if (!raw) return [];
+            try {
+                if (typeof raw === 'string') return JSON.parse(raw || '[]') || [];
+                if (Array.isArray(raw)) return raw;
+                return raw && typeof raw === 'object' ? raw : [];
+            } catch (e) { return []; }
+        };
+        const getPoolProviderIDs = (p) => {
+            const tiers = getPoolTiers(p);
+            const s = new Set();
+            (tiers || []).forEach(t => (t.items || []).forEach(it => s.add(Number(it.provider_id))));
+            return Array.from(s);
+        };
+        const getPoolModels = (p) => {
+            const ids = new Set(getPoolProviderIDs(p));
+            const out = new Set();
+            providers.value.forEach(pr => {
+                if (!ids.has(pr.id)) return;
+                getModelsArray(pr.models_json).forEach(m => out.add(m));
+            });
+            return Array.from(out).sort();
+        };
+        const filterPoolModels = (p) => {
+            const q = String(poolModelSearch[p?.id] || '').trim().toLowerCase();
+            const arr = getPoolModels(p);
+            if (!q) return arr;
+            return arr.filter(m => String(m).toLowerCase().includes(q));
+        };
+
+        watch(currentTab, (v) => { 
+            if(v === 'logs') { startSSE(); fetchLogs(); } 
+            else if(es) { es.close(); es = null; } 
+        });
+
+        onMounted(() => { 
+            if(token.value) { 
+                fetchAll(); 
+                if(currentTab.value === 'logs') startSSE(); 
+            } 
+        });
+
+        return {
+            token, loginToken, saveToken, logout, tabs, currentTab,
+            pools, providers, credentials, logs, logQuery, hideTestLogs, filteredLogs, status, modal, form, activeProvider, activeCredentials, credForm,
+            fetchAll, fetchLogs, providersWithCreds, groupedProviders, providerFilter, editPool, savePool, editProvider, saveProvider,
+            manageCredentials, resetCredForm, editCredential, saveCredential, deleteItem,
+            copy, formatTime, getPoolName, countMapItems, formatStrategy, generateKey,
+            getModelsArray, countModels, setMapMode, addMapRow, removeMapRow,
+            applyManualModelsToForm, clearModelsForm,
+            refreshModels, batchTestProvider, testCredential, testModel, importDiscoveredModels, credTestModel,
+            autoTestAfterSave, modelTestResults,
+            getPoolUpstreamModels, getEffectiveMappingsForPool, runPoolTest,
+            addTier, removeTier, addProviderToTier, removeProviderFromTier, isProviderInTier, getProviderName, getProviderBaseURL,
+            toast
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>

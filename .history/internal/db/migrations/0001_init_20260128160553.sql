@@ -1,0 +1,96 @@
+CREATE TABLE IF NOT EXISTS providers (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(32) NOT NULL,
+  base_url VARCHAR(512) NOT NULL,
+  default_headers_json JSON NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_provider_type_base (type, base_url)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS credentials (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  provider_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  api_key_ciphertext BLOB NOT NULL,
+  key_last4 CHAR(4) NOT NULL,
+  weight INT NOT NULL DEFAULT 1,
+  rpm_limit INT NULL,
+  tpm_limit INT NULL,
+  concurrency_limit INT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_credentials_provider FOREIGN KEY (provider_id) REFERENCES providers(id),
+  KEY idx_credentials_provider (provider_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channels (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  credential_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  tags_json JSON NULL,
+  model_map_json JSON NULL,
+  extra_headers_json JSON NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_channels_credential FOREIGN KEY (credential_id) REFERENCES credentials(id),
+  KEY idx_channels_credential (credential_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pools (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  strategy VARCHAR(32) NOT NULL,
+  channel_ids_json JSON NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_pool_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS routing_rules (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  priority INT NOT NULL,
+  match_json JSON NOT NULL,
+  pool_id BIGINT UNSIGNED NOT NULL,
+  fallback_pool_id BIGINT UNSIGNED NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_rules_pool FOREIGN KEY (pool_id) REFERENCES pools(id),
+  CONSTRAINT fk_rules_fallback_pool FOREIGN KEY (fallback_pool_id) REFERENCES pools(id),
+  KEY idx_rules_priority (priority)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS request_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  request_id VARCHAR(64) NOT NULL,
+  facade VARCHAR(16) NOT NULL,
+  req_model VARCHAR(256) NOT NULL,
+  pool_id BIGINT UNSIGNED NULL,
+  channel_id BIGINT UNSIGNED NULL,
+  status INT NOT NULL,
+  latency_ms INT NOT NULL,
+  input_tokens INT NULL,
+  output_tokens INT NULL,
+  error_type VARCHAR(32) NULL,
+  error_message_hash VARCHAR(64) NULL,
+  KEY idx_logs_ts (ts),
+  KEY idx_logs_request (request_id),
+  KEY idx_logs_facade (facade)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channel_health (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  channel_id BIGINT UNSIGNED NOT NULL,
+  ok BOOLEAN NOT NULL,
+  latency_ms INT NULL,
+  last_error_type VARCHAR(32) NULL,
+  KEY idx_health_channel_ts (channel_id, ts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

@@ -1,0 +1,27 @@
+2026-01-28 17:07:25 0 [Note] Starting MariaDB 11.7.2-MariaDB source revision 80067a69feaeb5df30abb1bfaf7d4e713ccbf027 server_uid 8LGWoJDHRjDLOEEFdZNait+JTIU= as process 84317
+2026-01-28 17:07:25 0 [Note] InnoDB: Compressed tables use zlib 1.2.12
+2026-01-28 17:07:25 0 [Note] InnoDB: Number of transaction pools: 1
+2026-01-28 17:07:25 0 [Note] InnoDB: Using crc32 + pclmulqdq instructions
+2026-01-28 17:07:25 0 [Note] InnoDB: Initializing buffer pool, total size = 128.000MiB, chunk size = 2.000MiB
+2026-01-28 17:07:25 0 [Note] InnoDB: Completed initialization of buffer pool
+2026-01-28 17:07:25 0 [Note] InnoDB: End of log at LSN=47733
+2026-01-28 17:07:25 0 [Note] InnoDB: Opened 3 undo tablespaces
+2026-01-28 17:07:25 0 [Note] InnoDB: 128 rollback segments in 3 undo tablespaces are active.
+2026-01-28 17:07:25 0 [Note] InnoDB: Setting file './ibtmp1' size to 12.000MiB. Physically writing the file full; Please wait ...
+2026-01-28 17:07:25 0 [Note] InnoDB: File './ibtmp1' size is now 12.000MiB.
+2026-01-28 17:07:25 0 [Note] InnoDB: log sequence number 47733; transaction id 14
+2026-01-28 17:07:25 0 [Note] Plugin 'FEEDBACK' is disabled.
+2026-01-28 17:07:25 0 [Note] Plugin 'wsrep-provider' is disabled.
+2026-01-28 17:07:25 0 [Note] InnoDB: Loading buffer pool(s) from /Users/xushaoyang/Desktop/Claude负载与反代/.local/mariadb-data/ib_buffer_pool
+2026-01-28 17:07:25 0 [Note] InnoDB: Buffer pool(s) load completed at 260128 17:07:25
+2026-01-28 17:07:26 0 [Note] Server socket created on IP: '127.0.0.1'.
+2026-01-28 17:07:26 0 [Note] /usr/local/opt/mariadb/bin/mariadbd: ready for connections.
+Version: '11.7.2-MariaDB'  socket: '/Users/xushaoyang/Desktop/Claude负载与反代/.local/mariadb.sock'  port: 3307  Homebrew
+2026-01-28 17:27:57 0 [Note] /usr/local/opt/mariadb/bin/mariadbd (initiated by: unknown): Normal shutdown
+2026-01-28 17:27:57 0 [Note] InnoDB: FTS optimize thread exiting.
+2026-01-28 17:27:57 0 [Note] InnoDB: Starting shutdown...
+2026-01-28 17:27:57 0 [Note] InnoDB: Dumping buffer pool(s) to /Users/xushaoyang/Desktop/Claude负载与反代/.local/mariadb-data/ib_buffer_pool
+2026-01-28 17:27:57 0 [Note] InnoDB: Buffer pool(s) dump completed at 260128 17:27:57
+2026-01-28 17:27:58 0 [Note] InnoDB: Removed temporary tablespace data file: "./ibtmp1"
+2026-01-28 17:27:58 0 [Note] InnoDB: Shutdown completed; log sequence number 85035; transaction id 49
+2026-01-28 17:27:58 0 [Note] /usr/local/opt/mariadb/bin/mariadbd: Shutdown complete

@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claude Gateway</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #f5f2ed;
+        --card-bg: #ffffff;
+        --primary-color: #d97757;
+        --primary-hover: #c4633a;
+        --text-main: #1d1d1b;
+        --text-muted: #6b6a68;
+        --border-color: #e8e6dc;
+        --code-bg: #f0ede4;
+        --log-bg: #141413;
+        --radius: 12px;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+      }
+
+      * { box-sizing: border-box; }
+      body { 
+        font-family: 'Poppins', system-ui, -apple-system, sans-serif; 
+        background-color: var(--bg-color); 
+        color: var(--text-main);
+        margin: 0;
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1000px;
+        padding: 40px 20px;
+      }
+
+      h1, h2, h3 { 
+        font-family: 'Lora', serif; 
+        font-weight: 600;
+        margin-top: 0;
+      }
+
+      h1 { font-size: 2.5rem; margin-bottom: 32px; text-align: center; color: var(--text-main); }
+      h2 { font-size: 1.5rem; margin-bottom: 20px; }
+      h3 { font-size: 1.25rem; margin-bottom: 16px; color: var(--text-muted); }
+
+      code { 
+        background: var(--code-bg); 
+        padding: 2px 6px; 
+        border-radius: 6px; 
+        font-family: ui-monospace, monospace;
+        font-size: 0.9em;
+      }
+
+      input, textarea, select { 
+        width: 100%; 
+        padding: 10px 14px; 
+        border: 1px solid var(--border-color); 
+        border-radius: var(--radius); 
+        background-color: var(--card-bg);
+        font-family: inherit;
+        font-size: 0.95rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+      }
+      input:focus, textarea:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.1);
+      }
+
+      textarea { min-height: 100px; resize: vertical; }
+
+      button { 
+        padding: 10px 20px; 
+        border: none; 
+        background: var(--primary-color); 
+        color: #fff; 
+        border-radius: var(--radius); 
+        cursor: pointer; 
+        font-weight: 500;
+        font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+      }
+      button:hover { background: var(--primary-hover); }
+      button:active { transform: scale(0.98); }
+      button.secondary { 
+        background: transparent; 
+        color: var(--text-main); 
+        border: 1px solid var(--border-color);
+      }
+      button.secondary:hover { background: var(--border-color); }
+
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .card { 
+        background: var(--card-bg);
+        border: 1px solid var(--border-color); 
+        border-radius: var(--radius); 
+        padding: 24px; 
+        margin-bottom: 24px; 
+        box-shadow: var(--shadow);
+      }
+      .muted { color: var(--text-muted); font-size: 0.9rem; }
+
+      .tabs { 
+        display: flex; 
+        gap: 12px; 
+        flex-wrap: wrap; 
+        margin-bottom: 32px; 
+        justify-content: center;
+      }
+      .tab { 
+        padding: 8px 18px; 
+        border-radius: 999px; 
+        cursor: pointer; 
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+        color: var(--text-muted);
+        border: 1px solid transparent;
+      }
+      .tab:hover { background: rgba(0,0,0,0.03); }
+      .tab.active { 
+        background: var(--primary-color); 
+        color: white;
+      }
+
+      .table-container { overflow-x: auto; margin: 0 -24px; }
+      table { width: 100%; border-collapse: collapse; min-width: 600px; }
+      th { 
+        text-align: left; 
+        padding: 12px 24px; 
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+      }
+      td { 
+        text-align: left; 
+        padding: 16px 24px; 
+        border-bottom: 1px solid var(--border-color); 
+        vertical-align: middle;
+        font-size: 0.95rem;
+      }
+      tr:last-child td { border-bottom: none; }
+
+      .logs { 
+        height: 400px; 
+        overflow: auto; 
+        font-family: ui-monospace, monospace; 
+        background: var(--log-bg); 
+        color: #e5e7eb; 
+        padding: 20px; 
+        border-radius: var(--radius); 
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .logline { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+      
+      .header-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+      .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+      .checkbox-group input { width: auto; }
+
+      @media (max-width: 600px) {
+        .row { grid-template-columns: 1fr; }
+        .container { padding: 20px 15px; }
+        h1 { font-size: 2rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Claude Gateway</h1>
+      
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="muted" style="margin-bottom: 8px;">管理 Token (Authorization: Bearer …)</div>
+            <input id="token" type="password" placeholder="ADMIN_TOKEN" />
+          </div>
+          <div class="header-actions" style="align-items: flex-end;">
+            <button class="secondary" id="saveToken">保存</button>
+            <button id="refreshAll">刷新</button>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:16px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+          API 端点：<code>/admin/api/*</code> ｜ 实时日志流：<code>/admin/api/logs/stream</code>
+        </div>
+      </div>
+
+      <div class="tabs" id="tabs"></div>
+      <div id="view"></div>
+    </div>
+
+    <script>
+      const tabs = [
+        { key: 'providers', name: 'Providers' },
+        { key: 'credentials', name: 'Credentials' },
+        { key: 'channels', name: 'Channels' },
+        { key: 'pools', name: 'Pools' },
+        { key: 'rules', name: 'Rules' },
+        { key: 'logs', name: 'Logs' },
+      ]
+
+      const state = {
+        active: localStorage.getItem('cg.activeTab') || 'providers',
+        token: localStorage.getItem('cg.adminToken') || '',
+        es: null,
+      }
+
+      const $ = (id) => document.getElementById(id)
+
+      function authHeaders() {
+        const t = state.token.trim()
+        return t ? { 'Authorization': 'Bearer ' + t } : {}
+      }
+
+      async function api(path, options = {}) {
+        const res = await fetch('/admin/api' + path, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+            ...(options.headers || {}),
+          },
+        })
+        if (res.status === 204) return null
+        const text = await res.text()
+        let json
+        try { json = text ? JSON.parse(text) : null } catch { json = { raw: text } }
+        if (!res.ok) throw new Error(json?.error || ('HTTP ' + res.status))
+        return json
+      }
+
+      function renderTabs() {
+        const el = $('tabs')
+        el.innerHTML = ''
+        for (const t of tabs) {
+          const d = document.createElement('div')
+          d.className = 'tab' + (state.active === t.key ? ' active' : '')
+          d.textContent = t.name
+          d.onclick = () => {
+            state.active = t.key
+            localStorage.setItem('cg.activeTab', t.key)
+            if (state.es) { state.es.close(); state.es = null }
+            render()
+          }
+          el.appendChild(d)
+        }
+      }
+
+      function table(headers, rows) {
+        const thead = '<tr>' + headers.map(h => '<th>' + h + '</th>').join('') + '</tr>'
+        const tbody = rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')
+        return '<table><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table>'
+      }
+
+      function jsonBox(v) {
+        const s = typeof v === 'string' ? v : JSON.stringify(v ?? null)
+        return '<code>' + s.replaceAll('<', '&lt;') + '</code>'
+      }
+
+      async function renderProviders() {
+        const list = await api('/providers')
+        const rows = list.map(p => [
+          String(p.id),
+          p.type,
+          p.base_url,
+          jsonBox(p.default_headers_json || null),
+          p.enabled ? 'true' : 'false',
+          '<button class="secondary" data-del-provider="' + p.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>Providers</h2>
+            ${table(['id','type','base_url','default_headers_json','enabled',''], rows)}
+          </div>
+          <div class="card">
+            <h3>新增 Provider</h3>
+            <div class="row">
+              <div><input id="p_type" placeholder="anthropic/openai/gemini" /></div>
+              <div><input id="p_base" placeholder="https://api.anthropic.com" /></div>
+            </div>
+            <div style="margin-top:8px;"><textarea id="p_hdrs" placeholder='default_headers_json，例如 {"anthropic-version":"2023-06-01"}'></textarea></div>
+            <div style="margin-top:8px;"><label><input type="checkbox" id="p_enabled" checked /> enabled</label></div>
+            <div style="margin-top:8px;"><button id="p_create">创建</button></div>
+          </div>
+        `
+      }
+
+      async function renderCredentials() {
+        const list = await api('/credentials')
+        const rows = list.map(c => [
+          String(c.id),
+          String(c.provider_id),
+          c.name,
+          c.key_last4 || '',
+          String(c.weight),
+          c.concurrency_limit == null ? '' : String(c.concurrency_limit),
+          c.enabled ? 'true' : 'false',
+          '<button class="secondary" data-del-cred="' + c.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>Credentials</h2>
+            ${table(['id','provider_id','name','key_last4','weight','concurrency','enabled',''], rows)}
+          </div>
+          <div class="card">
+            <h3>新增 Credential</h3>
+            <div class="row">
+              <div><input id="c_pid" placeholder="provider_id" /></div>
+              <div><input id="c_name" placeholder="name" /></div>
+            </div>
+            <div style="margin-top:8px;"><input id="c_key" placeholder="api_key（仅写入时使用，不会回显）" /></div>
+            <div class="row" style="margin-top:8px;">
+              <div><input id="c_weight" placeholder="weight (默认 1)" /></div>
+              <div><input id="c_conc" placeholder="concurrency_limit（可空）" /></div>
+            </div>
+            <div style="margin-top:8px;"><label><input type="checkbox" id="c_enabled" checked /> enabled</label></div>
+            <div style="margin-top:8px;"><button id="c_create">创建</button></div>
+          </div>
+        `
+      }
+
+      async function renderChannels() {
+        const list = await api('/channels')
+        const rows = list.map(c => [
+          String(c.id),
+          String(c.credential_id),
+          c.name,
+          jsonBox(c.model_map_json || null),
+          jsonBox(c.extra_headers_json || null),
+          c.enabled ? 'true' : 'false',
+          '<button class="secondary" data-del-channel="' + c.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>Channels</h2>
+            ${table(['id','credential_id','name','model_map_json','extra_headers_json','enabled',''], rows)}
+          </div>
+          <div class="card">
+            <h3>新增 Channel</h3>
+            <div class="row">
+              <div><input id="ch_cid" placeholder="credential_id" /></div>
+              <div><input id="ch_name" placeholder="name" /></div>
+            </div>
+            <div style="margin-top:8px;"><textarea id="ch_modelmap" placeholder='model_map_json，例如 {"claude-sonnet-4-5":"claude-sonnet-4-5-20250929"}'></textarea></div>
+            <div style="margin-top:8px;"><textarea id="ch_hdrs" placeholder='extra_headers_json，例如 {"anthropic-version":"2023-06-01"}'></textarea></div>
+            <div style="margin-top:8px;"><label><input type="checkbox" id="ch_enabled" checked /> enabled</label></div>
+            <div style="margin-top:8px;"><button id="ch_create">创建</button></div>
+          </div>
+        `
+      }
+
+      async function renderPools() {
+        const list = await api('/pools')
+        const rows = list.map(p => [
+          String(p.id),
+          p.name,
+          p.strategy,
+          jsonBox(p.channel_ids),
+          p.enabled ? 'true' : 'false',
+          '<button class="secondary" data-del-pool="' + p.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>Pools</h2>
+            ${table(['id','name','strategy','channel_ids','enabled',''], rows)}
+            <div class="muted" style="margin-top:8px;">strategy: round_robin / weighted_rr / least_inflight / priority_failover</div>
+          </div>
+          <div class="card">
+            <h3>新增 Pool</h3>
+            <div class="row">
+              <div><input id="pl_name" placeholder="name（建议 default）" /></div>
+              <div><input id="pl_strategy" placeholder="strategy" value="round_robin" /></div>
+            </div>
+            <div style="margin-top:8px;"><input id="pl_channels" placeholder="channel_ids（逗号分隔）例如 12,13" /></div>
+            <div style="margin-top:8px;"><label><input type="checkbox" id="pl_enabled" checked /> enabled</label></div>
+            <div style="margin-top:8px;"><button id="pl_create">创建</button></div>
+          </div>
+        `
+      }
+
+      async function renderRules() {
+        const list = await api('/rules')
+        const rows = list.map(rr => [
+          String(rr.id),
+          String(rr.priority),
+          jsonBox(rr.match_json || {}),
+          String(rr.pool_id),
+          rr.fallback_pool_id == null ? '' : String(rr.fallback_pool_id),
+          rr.enabled ? 'true' : 'false',
+          '<button class="secondary" data-del-rule="' + rr.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>Rules</h2>
+            ${table(['id','priority','match_json','pool_id','fallback_pool_id','enabled',''], rows)}
+            <div class="muted" style="margin-top:8px;">match_json 支持：facade、model、model_regex（优先级越小越先匹配）</div>
+          </div>
+          <div class="card">
+            <h3>新增 Rule</h3>
+            <div class="row">
+              <div><input id="r_priority" placeholder="priority" value="10" /></div>
+              <div><input id="r_pool" placeholder="pool_id" /></div>
+            </div>
+            <div style="margin-top:8px;"><input id="r_fallback" placeholder="fallback_pool_id（可空）" /></div>
+            <div style="margin-top:8px;"><textarea id="r_match" placeholder='match_json，例如 {"facade":"anthropic","model_regex":".*sonnet.*"}'></textarea></div>
+            <div style="margin-top:8px;"><label><input type="checkbox" id="r_enabled" checked /> enabled</label></div>
+            <div style="margin-top:8px;"><button id="r_create">创建</button></div>
+          </div>
+        `
+      }
+
+      async function renderLogs() {
+        return `
+          <div class="card">
+            <h2>Logs</h2>
+            <div class="muted">打开后会自动订阅 SSE（仅展示最近 200 条）</div>
+            <div class="logs" id="logbox"></div>
+          </div>
+        `
+      }
+
+      async function render() {
+        renderTabs()
+        $('token').value = state.token
+        const view = $('view')
+        view.innerHTML = '<div class="muted">加载中…</div>'
+        try {
+          let html = ''
+          if (state.active === 'providers') html = await renderProviders()
+          if (state.active === 'credentials') html = await renderCredentials()
+          if (state.active === 'channels') html = await renderChannels()
+          if (state.active === 'pools') html = await renderPools()
+          if (state.active === 'rules') html = await renderRules()
+          if (state.active === 'logs') html = await renderLogs()
+          view.innerHTML = html
+          bindActions()
+        } catch (e) {
+          view.innerHTML = '<div class="card"><div style="color:#b91c1c;">' + String(e.message || e) + '</div></div>'
+        }
+      }
+
+      function bindActions() {
+        if (state.active === 'providers') {
+          $('p_create').onclick = async () => {
+            const hdrs = $('p_hdrs').value.trim()
+            await api('/providers', { method: 'POST', body: JSON.stringify({
+              type: $('p_type').value.trim(),
+              base_url: $('p_base').value.trim(),
+              default_headers_json: hdrs ? JSON.parse(hdrs) : null,
+              enabled: $('p_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-provider]').forEach(btn => btn.onclick = async () => {
+            await api('/providers/' + btn.dataset.delProvider, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'credentials') {
+          $('c_create').onclick = async () => {
+            const conc = $('c_conc').value.trim()
+            await api('/credentials', { method: 'POST', body: JSON.stringify({
+              provider_id: Number($('c_pid').value),
+              name: $('c_name').value.trim(),
+              api_key: $('c_key').value.trim(),
+              weight: Number($('c_weight').value || 1),
+              concurrency_limit: conc ? Number(conc) : null,
+              enabled: $('c_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-cred]').forEach(btn => btn.onclick = async () => {
+            await api('/credentials/' + btn.dataset.delCred, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'channels') {
+          $('ch_create').onclick = async () => {
+            const mm = $('ch_modelmap').value.trim()
+            const hdrs = $('ch_hdrs').value.trim()
+            await api('/channels', { method: 'POST', body: JSON.stringify({
+              credential_id: Number($('ch_cid').value),
+              name: $('ch_name').value.trim(),
+              model_map_json: mm ? JSON.parse(mm) : null,
+              extra_headers_json: hdrs ? JSON.parse(hdrs) : null,
+              enabled: $('ch_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-channel]').forEach(btn => btn.onclick = async () => {
+            await api('/channels/' + btn.dataset.delChannel, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'pools') {
+          $('pl_create').onclick = async () => {
+            const ids = $('pl_channels').value.split(',').map(x => x.trim()).filter(Boolean).map(Number)
+            await api('/pools', { method: 'POST', body: JSON.stringify({
+              name: $('pl_name').value.trim(),
+              strategy: $('pl_strategy').value.trim(),
+              channel_ids: ids,
+              enabled: $('pl_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-pool]').forEach(btn => btn.onclick = async () => {
+            await api('/pools/' + btn.dataset.delPool, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'rules') {
+          $('r_create').onclick = async () => {
+            const fb = $('r_fallback').value.trim()
+            const match = $('r_match').value.trim()
+            await api('/rules', { method: 'POST', body: JSON.stringify({
+              priority: Number($('r_priority').value),
+              match_json: match ? JSON.parse(match) : {},
+              pool_id: Number($('r_pool').value),
+              fallback_pool_id: fb ? Number(fb) : null,
+              enabled: $('r_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-rule]').forEach(btn => btn.onclick = async () => {
+            await api('/rules/' + btn.dataset.delRule, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'logs') {
+          const box = $('logbox')
+          const token = state.token.trim()
+          if (!token) {
+            box.innerHTML = '<div class="logline">需要先设置 ADMIN_TOKEN</div>'
+            return
+          }
+          if (state.es) state.es.close()
+          const url = '/admin/api/logs/stream?token=' + encodeURIComponent(token)
+          const es = new EventSource(url, { withCredentials: false })
+          state.es = es
+          es.onmessage = () => {}
+          es.addEventListener('log', (ev) => {
+            try {
+              const obj = JSON.parse(ev.data)
+              const line = `[${obj.ts}] ${obj.facade} model=${obj.model} provider=${obj.provider_type} pool=${obj.pool_id} ch=${obj.channel_id} status=${obj.status} ${obj.latency_ms}ms ${obj.error || ''}`
+              const div = document.createElement('div')
+              div.className = 'logline'
+              div.textContent = line
+              box.appendChild(div)
+              while (box.childNodes.length > 200) box.removeChild(box.firstChild)
+              box.scrollTop = box.scrollHeight
+            } catch {}
+          })
+          es.onerror = () => {
+            const div = document.createElement('div')
+            div.className = 'logline'
+            div.textContent = '[error] SSE disconnected'
+            box.appendChild(div)
+          }
+        }
+      }
+
+      $('saveToken').onclick = () => {
+        state.token = $('token').value.trim()
+        localStorage.setItem('cg.adminToken', state.token)
+        render()
+      }
+      $('refreshAll').onclick = () => render()
+      $('token').value = state.token
+
+      render()
+    </script>
+  </body>
+</html>

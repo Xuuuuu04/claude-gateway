@@ -1,0 +1,9 @@
+SET @db := DATABASE();
+
+SET @exists := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'request_logs' AND COLUMN_NAME = 'ttft_ms');
+SET @sql := IF(@exists = 0, 'ALTER TABLE request_logs ADD COLUMN ttft_ms BIGINT NULL AFTER latency_ms', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'request_logs' AND COLUMN_NAME = 'tps');
+SET @sql := IF(@exists = 0, 'ALTER TABLE request_logs ADD COLUMN tps DOUBLE NULL AFTER ttft_ms', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

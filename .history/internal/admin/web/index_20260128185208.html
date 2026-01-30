@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claude Gateway</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #f5f2ed;
+        --card-bg: #ffffff;
+        --primary-color: #d97757;
+        --primary-hover: #c4633a;
+        --text-main: #1d1d1b;
+        --text-muted: #6b6a68;
+        --border-color: #e8e6dc;
+        --code-bg: #f0ede4;
+        --log-bg: #141413;
+        --radius: 12px;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+      }
+
+      * { box-sizing: border-box; }
+      body { 
+        font-family: 'Poppins', system-ui, -apple-system, sans-serif; 
+        background-color: var(--bg-color); 
+        color: var(--text-main);
+        margin: 0;
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1280px;
+        padding: 40px 20px;
+      }
+
+      h1, h2, h3 { 
+        font-family: 'Lora', serif; 
+        font-weight: 600;
+        margin-top: 0;
+      }
+
+      h1 { font-size: 2.5rem; margin-bottom: 32px; text-align: center; color: var(--text-main); }
+      h2 { font-size: 1.5rem; margin-bottom: 20px; }
+      h3 { font-size: 1.25rem; margin-bottom: 16px; color: var(--text-muted); }
+
+      code { 
+        background: var(--code-bg); 
+        padding: 2px 6px; 
+        border-radius: 6px; 
+        font-family: ui-monospace, monospace;
+        font-size: 0.9em;
+      }
+
+      input, textarea, select { 
+        width: 100%; 
+        padding: 10px 14px; 
+        border: 1px solid var(--border-color); 
+        border-radius: var(--radius); 
+        background-color: var(--card-bg);
+        font-family: inherit;
+        font-size: 0.95rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+      }
+      input:focus, textarea:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.1);
+      }
+
+      textarea { min-height: 100px; resize: vertical; }
+      textarea.mono { font-family: ui-monospace, monospace; font-size: 0.9rem; line-height: 1.45; }
+      textarea.tight { min-height: 120px; }
+
+      .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+      .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); }
+      .pill code { background: transparent; padding: 0; }
+
+      button { 
+        padding: 10px 20px; 
+        border: none; 
+        background: var(--primary-color); 
+        color: #fff; 
+        border-radius: var(--radius); 
+        cursor: pointer; 
+        font-weight: 500;
+        font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+      }
+      button:hover { background: var(--primary-hover); }
+      button:active { transform: scale(0.98); }
+      button.secondary { 
+        background: transparent; 
+        color: var(--text-main); 
+        border: 1px solid var(--border-color);
+      }
+      button.secondary:hover { background: var(--border-color); }
+
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .card { 
+        background: var(--card-bg);
+        border: 1px solid var(--border-color); 
+        border-radius: var(--radius); 
+        padding: 24px; 
+        margin-bottom: 24px; 
+        box-shadow: var(--shadow);
+      }
+      .muted { color: var(--text-muted); font-size: 0.9rem; }
+
+      .tabs { 
+        display: flex; 
+        gap: 12px; 
+        flex-wrap: wrap; 
+        margin-bottom: 32px; 
+        justify-content: center;
+      }
+      .tab { 
+        padding: 8px 18px; 
+        border-radius: 999px; 
+        cursor: pointer; 
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+        color: var(--text-muted);
+        border: 1px solid transparent;
+      }
+      .tab:hover { background: rgba(0,0,0,0.03); }
+      .tab.active { 
+        background: var(--primary-color); 
+        color: white;
+      }
+
+      .table-container { overflow-x: auto; margin: 0 -24px; }
+      table { width: 100%; border-collapse: collapse; min-width: 760px; }
+      th { 
+        text-align: left; 
+        padding: 12px 24px; 
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+      }
+      td { 
+        text-align: left; 
+        padding: 16px 24px; 
+        border-bottom: 1px solid var(--border-color); 
+        vertical-align: middle;
+        font-size: 0.95rem;
+      }
+      tr:last-child td { border-bottom: none; }
+      .table-container input { padding: 7px 10px; font-size: 0.9rem; }
+      .table-container button { padding: 8px 12px; }
+      .table-container td { padding: 12px 24px; }
+      .nowrap { white-space: nowrap; }
+      .truncate { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+
+      .logs { 
+        height: 400px; 
+        overflow: auto; 
+        font-family: ui-monospace, monospace; 
+        background: var(--log-bg); 
+        color: #e5e7eb; 
+        padding: 20px; 
+        border-radius: var(--radius); 
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .logline { white-space: pre-wrap; word-break: break-word; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+      
+      .header-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+      .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+      .checkbox-group input { width: auto; }
+      .divider { height: 1px; background: var(--border-color); margin: 16px 0; }
+
+      @media (max-width: 600px) {
+        .row { grid-template-columns: 1fr; }
+        .split { grid-template-columns: 1fr; }
+        .container { padding: 20px 15px; }
+        h1 { font-size: 2rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Claude 网关管理控制台</h1>
+      
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="muted" style="margin-bottom: 8px;">管理 Token (Authorization: Bearer …)</div>
+            <input id="token" type="password" placeholder="ADMIN_TOKEN" />
+          </div>
+          <div class="header-actions" style="align-items: flex-end;">
+            <button class="secondary" id="saveToken">保存</button>
+            <button id="refreshAll">刷新</button>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:16px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+          API 端点：<code>/admin/api/*</code> ｜ 实时日志流：<code>/admin/api/logs/stream</code>
+        </div>
+      </div>
+
+      <div class="tabs" id="tabs"></div>
+      <div id="view"></div>
+    </div>
+
+    <script>
+      const tabs = [
+        { key: 'providers', name: '供应商' },
+        { key: 'channels', name: '分发渠道' },
+        { key: 'pools', name: '渠道池' },
+        { key: 'rules', name: '路由规则' },
+        { key: 'logs', name: '实时日志' },
+      ]
+
+      const state = {
+        active: localStorage.getItem('cg.activeTab') || 'providers',
+        token: localStorage.getItem('cg.adminToken') || '',
+        providerDetailId: 0,
+        es: null,
+      }
+
+      const $ = (id) => document.getElementById(id)
+
+      function authHeaders() {
+        const t = state.token.trim()
+        return t ? { 'Authorization': 'Bearer ' + t } : {}
+      }
+
+      async function api(path, options = {}) {
+        const res = await fetch('/admin/api' + path, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+            ...(options.headers || {}),
+          },
+        })
+        if (res.status === 204) return null
+        const text = await res.text()
+        let json
+        try { json = text ? JSON.parse(text) : null } catch { json = { raw: text } }
+        if (!res.ok) throw new Error(json?.error || ('HTTP ' + res.status))
+        return json
+      }
+
+      function renderTabs() {
+        const el = $('tabs')
+        el.innerHTML = ''
+        for (const t of tabs) {
+          const d = document.createElement('div')
+          d.className = 'tab' + (state.active === t.key ? ' active' : '')
+          d.textContent = t.name
+          d.onclick = () => {
+            state.active = t.key
+            localStorage.setItem('cg.activeTab', t.key)
+            if (state.es) { state.es.close(); state.es = null }
+            render()
+          }
+          el.appendChild(d)
+        }
+      }
+
+      function table(headers, rows) {
+        const thead = '<tr>' + headers.map(h => '<th>' + h + '</th>').join('') + '</tr>'
+        const tbody = rows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')
+        return '<div class="table-container"><table><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>'
+      }
+
+      function esc(s) {
+        return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+      }
+
+      function jsonCount(v) {
+        if (!v || typeof v !== 'object') return 0
+        try { return Object.keys(v).length } catch { return 0 }
+      }
+
+      function jsonBox(v) {
+        const s = typeof v === 'string' ? v : JSON.stringify(v ?? null)
+        const full = esc(s)
+        const short = s.length > 160 ? esc(s.slice(0, 160) + '…') : full
+        return '<code class="truncate" title="' + full + '">' + short + '</code>'
+      }
+
+      function pretty(v) {
+        try { return JSON.stringify(v ?? null, null, 2) } catch { return JSON.stringify(v ?? null) }
+      }
+
+      async function renderProviders() {
+        const list = await api('/providers') || []
+        if (state.providerDetailId) {
+          const pid = state.providerDetailId
+          const p = list.find(x => Number(x.id) === Number(pid))
+          if (!p) {
+            state.providerDetailId = 0
+            return renderProviders()
+          }
+          const creds = await api('/credentials?provider_id=' + encodeURIComponent(String(pid))) || []
+          const rows = creds.map(c => [
+            String(c.id),
+            '<input data-cred-name="' + c.id + '" value="' + String(c.name || '').replaceAll('"','&quot;') + '" />',
+            c.key_last4 || '',
+            '<input data-cred-weight="' + c.id + '" value="' + String(c.weight ?? 1) + '" />',
+            '<input data-cred-conc="' + c.id + '" value="' + (c.concurrency_limit == null ? '' : String(c.concurrency_limit)) + '" placeholder="可留空" />',
+            '<label class="checkbox-group" style="justify-content:center;"><input type="checkbox" data-cred-enabled="' + c.id + '"' + (c.enabled ? ' checked' : '') + ' /></label>',
+            '<button class="secondary" data-save-cred="' + c.id + '">保存</button> <button class="secondary" data-del-cred="' + c.id + '">删除</button>',
+          ])
+          const mmCount = jsonCount(p.model_map_json)
+          return `
+            <div class="card">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div>
+                  <h2 style="margin:0;">供应商详情</h2>
+                  <div class="kpi">
+                    <span class="pill">Provider ID：<code>${String(p.id)}</code></span>
+                    <span class="pill">Keys：<code>${String(creds.length)}</code></span>
+                    <span class="pill">模型映射：<code>${String(mmCount)}</code> 项</span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary" id="p_back">返回列表</button>
+                  <button class="secondary" id="p_quick_init">快速初始化路由</button>
+                </div>
+              </div>
+              <div style="margin-top:18px;" class="row">
+                <div><input id="p_type_u" value="${String(p.type || '').replaceAll('"','&quot;')}" placeholder="供应商类型 (anthropic/openai/gemini)" /></div>
+                <div><input id="p_base_u" value="${String(p.base_url || '').replaceAll('"','&quot;')}" placeholder="基础地址 (Base URL)" /></div>
+              </div>
+              <div class="split" style="margin-top:16px;">
+                <div>
+                  <div class="muted" style="margin-bottom:8px;">默认请求头（JSON）</div>
+                  <textarea class="mono tight" id="p_hdrs_u" placeholder='默认请求头 JSON'>${esc(pretty(p.default_headers_json))}</textarea>
+                  <div class="actions" style="margin-top:10px; justify-content:flex-start;">
+                    <button class="secondary" id="p_fmt_hdrs">格式化 JSON</button>
+                  </div>
+                </div>
+                <div>
+                  <div class="muted" style="margin-bottom:8px;">模型映射（JSON）</div>
+                  <textarea class="mono tight" id="p_modelmap_u" placeholder='模型映射 JSON，例如 {"claude-3-5-sonnet":"claude-3-5-sonnet-20241022"}'>${esc(pretty(p.model_map_json))}</textarea>
+                  <div class="actions" style="margin-top:10px; justify-content:flex-start;">
+                    <button class="secondary" id="p_fmt_modelmap">格式化 JSON</button>
+                  </div>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="actions" style="justify-content:space-between;">
+                <label class="checkbox-group"><input type="checkbox" id="p_enabled_u"${p.enabled ? ' checked' : ''} /> 启用</label>
+                <div class="actions">
+                  <button id="p_update">保存供应商</button>
+                  <button class="secondary" data-del-provider="${String(p.id)}">删除供应商</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>Key 管理（凭据）</h2>
+              ${table(['ID','名称','末 4 位','权重','并发限制','启用','操作'], rows)}
+              <div class="muted" style="margin-top:12px;">提示：大量 Key 建议用“批量导入”。保存不会回显明文 key。</div>
+            </div>
+
+            <div class="card">
+              <h3>批量导入 Key</h3>
+              <div class="muted" style="margin-bottom:12px;">每行一条：<code>API_KEY</code> 或 <code>name,API_KEY</code> 或 <code>name,API_KEY,weight,concurrency_limit,enabled</code></div>
+              <textarea id="bulk_keys" placeholder="例如：\nkey1,sk-***,1,20,true\nsk-***\nkey3,sk-***,2,,true"></textarea>
+              <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+                <button id="bulk_import">导入</button>
+                <button class="secondary" id="bulk_clear">清空</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>新增单条 Key</h3>
+              <div class="row">
+                <div><input id="c_name" placeholder="凭据名称" /></div>
+                <div><input id="c_key" type="password" placeholder="API 密钥（仅写入时使用）" /></div>
+              </div>
+              <div class="row" style="margin-top:16px;">
+                <div><input id="c_weight" placeholder="权重 (默认 1)" /></div>
+                <div><input id="c_conc" placeholder="并发限制（可留空）" /></div>
+              </div>
+              <div style="margin-top:16px;" class="checkbox-group"><label><input type="checkbox" id="c_enabled" checked /> 立即启用</label></div>
+              <div style="margin-top:16px;"><button id="c_create">创建 Key</button></div>
+            </div>
+          `
+        }
+
+        const rows = list.map(p => [
+          String(p.id),
+          p.type,
+          '<span class="truncate" title="' + esc(p.base_url || '') + '">' + esc(p.base_url || '') + '</span>',
+          (jsonCount(p.model_map_json) ? (String(jsonCount(p.model_map_json)) + ' 项') : '-'),
+          p.enabled ? '启用' : '禁用',
+          '<button class="secondary" data-manage-provider="' + p.id + '">管理</button> <button class="secondary" data-del-provider="' + p.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>供应商列表</h2>
+            <div class="row" style="margin-bottom:16px;">
+              <div><input id="p_filter" placeholder="搜索：类型 / Base URL / ID" /></div>
+              <div class="actions" style="justify-content:flex-end;"><button class="secondary" id="p_filter_clear">清空筛选</button></div>
+            </div>
+            ${table(['ID','供应商类型','基础地址 (Base URL)','模型映射','状态','操作'], rows)}
+          </div>
+          <div class="card">
+            <h3>新增供应商</h3>
+            <div class="row">
+              <div><input id="p_type" placeholder="供应商类型 (如 anthropic/openai/gemini)" /></div>
+              <div><input id="p_base" placeholder="基础地址 (如 https://api.anthropic.com)" /></div>
+            </div>
+            <div style="margin-top:16px;"><textarea id="p_hdrs" placeholder='默认请求头 JSON，例如 {"anthropic-version":"2023-06-01"}'></textarea></div>
+            <div style="margin-top:16px;"><textarea id="p_modelmap" placeholder='模型映射 JSON（可选）'></textarea></div>
+            <div style="margin-top:16px;" class="checkbox-group"><label><input type="checkbox" id="p_enabled" checked /> 立即启用</label></div>
+            <div style="margin-top:16px;"><button id="p_create">创建供应商</button></div>
+          </div>
+        `
+      }
+
+      async function renderChannels() {
+        const list = await api('/channels') || []
+        const rows = list.map(c => [
+          String(c.id),
+          String(c.credential_id),
+          c.name,
+          jsonBox(c.model_map_json || null),
+          jsonBox(c.extra_headers_json || null),
+          c.enabled ? '启用' : '禁用',
+          '<button class="secondary" data-del-channel="' + c.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>分发渠道 (Channels)</h2>
+            ${table(['ID','凭据 ID','名称','模型映射','额外请求头','状态','操作'], rows)}
+          </div>
+          <div class="card">
+            <h3>新增分发渠道</h3>
+            <div class="row">
+              <div><input id="ch_cid" placeholder="凭据 ID" /></div>
+              <div><input id="ch_name" placeholder="渠道名称" /></div>
+            </div>
+            <div style="margin-top:16px;"><textarea id="ch_modelmap" placeholder='模型映射 JSON，例如 {"claude-3-5-sonnet":"claude-3-5-sonnet-20241022"}'></textarea></div>
+            <div style="margin-top:16px;"><textarea id="ch_hdrs" placeholder='额外请求头 JSON，例如 {"x-custom-header":"value"}'></textarea></div>
+            <div style="margin-top:16px;" class="checkbox-group"><label><input type="checkbox" id="ch_enabled" checked /> 立即启用</label></div>
+            <div style="margin-top:16px;"><button id="ch_create">创建渠道</button></div>
+          </div>
+        `
+      }
+
+      async function renderPools() {
+        const list = await api('/pools') || []
+        const rows = list.map(p => [
+          String(p.id),
+          p.name,
+          p.strategy,
+          jsonBox(p.channel_ids),
+          p.enabled ? '启用' : '禁用',
+          '<button class="secondary" data-del-pool="' + p.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>渠道池 (Pools)</h2>
+            ${table(['ID','池名称','调度策略','包含渠道 ID','状态','操作'], rows)}
+            <div class="muted" style="margin-top:12px;">可用调度策略：<code>round_robin</code> (轮询) / <code>weighted_rr</code> (加权轮询) / <code>least_inflight</code> (最小并发) / <code>priority_failover</code> (优先级故障转移)</div>
+          </div>
+          <div class="card">
+            <h3>新增渠道池</h3>
+            <div class="row">
+              <div><input id="pl_name" placeholder="池名称 (如 default)" /></div>
+              <div><input id="pl_strategy" placeholder="调度策略" value="round_robin" /></div>
+            </div>
+            <div style="margin-top:16px;"><input id="pl_channels" placeholder="渠道 ID 列表 (逗号分隔，例如 1,2,3)" /></div>
+            <div style="margin-top:16px;" class="checkbox-group"><label><input type="checkbox" id="pl_enabled" checked /> 立即启用</label></div>
+            <div style="margin-top:16px;"><button id="pl_create">创建渠道池</button></div>
+          </div>
+        `
+      }
+
+      async function renderRules() {
+        const list = await api('/rules') || []
+        const rows = list.map(rr => [
+          String(rr.id),
+          String(rr.priority),
+          jsonBox(rr.match_json || {}),
+          String(rr.pool_id),
+          rr.fallback_pool_id == null ? '-' : String(rr.fallback_pool_id),
+          rr.enabled ? '启用' : '禁用',
+          '<button class="secondary" data-del-rule="' + rr.id + '">删除</button>',
+        ])
+        return `
+          <div class="card">
+            <h2>路由规则 (Rules)</h2>
+            ${table(['ID','优先级','匹配条件','目标池 ID','备选池 ID','状态','操作'], rows)}
+            <div class="muted" style="margin-top:12px;">匹配条件支持：<code>facade</code> (接口类型), <code>model</code> (模型名), <code>model_regex</code> (正则匹配)。优先级越小越先匹配。</div>
+          </div>
+          <div class="card">
+            <h3>新增路由规则</h3>
+            <div class="row">
+              <div><input id="r_priority" placeholder="优先级 (数字，越小越优先)" value="10" /></div>
+              <div><input id="r_pool" placeholder="目标渠道池 ID" /></div>
+            </div>
+            <div style="margin-top:16px;"><input id="r_fallback" placeholder="备选渠道池 ID (可选)" /></div>
+            <div style="margin-top:16px;"><textarea id="r_match" placeholder='匹配条件 JSON，例如 {"facade":"anthropic","model_regex":".*sonnet.*"}'></textarea></div>
+            <div style="margin-top:16px;" class="checkbox-group"><label><input type="checkbox" id="r_enabled" checked /> 立即启用</label></div>
+            <div style="margin-top:16px;"><button id="r_create">创建规则</button></div>
+          </div>
+        `
+      }
+
+      async function renderLogs() {
+        return `
+          <div class="card">
+            <h2>实时日志 (Logs)</h2>
+            <div class="muted" style="margin-bottom: 16px;">通过 SSE 实时订阅系统日志 (仅展示最近 200 条)</div>
+            <div class="logs" id="logbox"></div>
+          </div>
+        `
+      }
+
+      async function render() {
+        renderTabs()
+        $('token').value = state.token
+        const view = $('view')
+        view.innerHTML = '<div class="muted">加载中…</div>'
+        try {
+          let html = ''
+          if (state.active === 'providers') html = await renderProviders()
+          if (state.active === 'channels') html = await renderChannels()
+          if (state.active === 'pools') html = await renderPools()
+          if (state.active === 'rules') html = await renderRules()
+          if (state.active === 'logs') html = await renderLogs()
+          view.innerHTML = html
+          bindActions()
+        } catch (e) {
+          view.innerHTML = '<div class="card"><div style="color:#b91c1c;">' + String(e.message || e) + '</div></div>'
+        }
+      }
+
+      function bindActions() {
+        if (state.active === 'providers') {
+          if (state.providerDetailId) {
+            const pid = state.providerDetailId
+
+            $('p_back').onclick = () => {
+              state.providerDetailId = 0
+              render()
+            }
+
+            function formatJSONTextarea(id) {
+              const el = $(id)
+              const raw = el.value.trim()
+              if (!raw) {
+                el.value = 'null'
+                return
+              }
+              const obj = JSON.parse(raw)
+              el.value = JSON.stringify(obj, null, 2)
+            }
+
+            $('p_update').onclick = async () => {
+              const hdrs = $('p_hdrs_u').value.trim()
+              const mm = $('p_modelmap_u').value.trim()
+              await api('/providers/' + pid, { method: 'PUT', body: JSON.stringify({
+                type: $('p_type_u').value.trim(),
+                base_url: $('p_base_u').value.trim(),
+                default_headers_json: hdrs ? JSON.parse(hdrs) : null,
+                model_map_json: mm ? JSON.parse(mm) : null,
+                enabled: $('p_enabled_u').checked,
+              })})
+              render()
+            }
+
+            $('p_fmt_hdrs').onclick = () => formatJSONTextarea('p_hdrs_u')
+            $('p_fmt_modelmap').onclick = () => formatJSONTextarea('p_modelmap_u')
+
+            $('c_create').onclick = async () => {
+              const conc = $('c_conc').value.trim()
+              await api('/credentials', { method: 'POST', body: JSON.stringify({
+                provider_id: Number(pid),
+                name: $('c_name').value.trim(),
+                api_key: $('c_key').value.trim(),
+                weight: Number($('c_weight').value || 1),
+                concurrency_limit: conc ? Number(conc) : null,
+                enabled: $('c_enabled').checked,
+              })})
+              render()
+            }
+
+            $('bulk_clear').onclick = () => { $('bulk_keys').value = '' }
+            $('bulk_import').onclick = async () => {
+              const raw = $('bulk_keys').value.split('\n').map(x => x.trim()).filter(Boolean)
+              const items = []
+              let autoN = 1
+              for (const line of raw) {
+                const parts = line.split(',').map(x => x.trim())
+                let name = ''
+                let key = ''
+                let weight = 1
+                let conc = null
+                let enabled = true
+                if (parts.length === 1) {
+                  key = parts[0]
+                  name = 'key-' + autoN++
+                } else {
+                  name = parts[0]
+                  key = parts[1] || ''
+                  if (parts[2]) weight = Number(parts[2] || 1)
+                  if (parts[3]) conc = parts[3] === '' ? null : Number(parts[3])
+                  if (parts[4]) enabled = ['1','true','yes','y','on'].includes(String(parts[4]).toLowerCase())
+                }
+                items.push({ name, api_key: key, weight, concurrency_limit: conc, enabled })
+              }
+              await api('/credentials/bulk', { method: 'POST', body: JSON.stringify({ provider_id: Number(pid), items }) })
+              $('bulk_keys').value = ''
+              render()
+            }
+
+            document.querySelectorAll('[data-save-cred]').forEach(btn => btn.onclick = async () => {
+              const id = Number(btn.dataset.saveCred)
+              const name = document.querySelector('[data-cred-name="' + id + '"]').value.trim()
+              const weight = Number(document.querySelector('[data-cred-weight="' + id + '"]').value || 1)
+              const concRaw = document.querySelector('[data-cred-conc="' + id + '"]').value.trim()
+              const enabled = document.querySelector('[data-cred-enabled="' + id + '"]').checked
+              await api('/credentials/' + id, { method: 'PUT', body: JSON.stringify({
+                provider_id: Number(pid),
+                name,
+                api_key: '',
+                weight,
+                concurrency_limit: concRaw ? Number(concRaw) : null,
+                enabled,
+              })})
+              render()
+            })
+
+            document.querySelectorAll('[data-del-cred]').forEach(btn => btn.onclick = async () => {
+              await api('/credentials/' + btn.dataset.delCred, { method: 'DELETE' })
+              render()
+            })
+
+            $('p_quick_init').onclick = async () => {
+              const creds = await api('/credentials?provider_id=' + encodeURIComponent(String(pid))) || []
+              const channels = await api('/channels') || []
+
+              const byCred = new Map()
+              for (const ch of channels) {
+                if (!byCred.has(ch.credential_id)) byCred.set(ch.credential_id, [])
+                byCred.get(ch.credential_id).push(ch)
+              }
+
+              const channelIDs = []
+              for (const c of creds) {
+                const existing = byCred.get(c.id) || []
+                if (existing.length > 0) {
+                  channelIDs.push(existing[0].id)
+                  continue
+                }
+                const created = await api('/channels', { method: 'POST', body: JSON.stringify({
+                  credential_id: Number(c.id),
+                  name: 'auto-' + c.name,
+                  model_map_json: null,
+                  extra_headers_json: null,
+                  enabled: true,
+                })})
+                channelIDs.push(created.id)
+              }
+
+              const pools = await api('/pools') || []
+              let def = pools.find(p => p.name === 'default')
+              if (!def) {
+                def = await api('/pools', { method: 'POST', body: JSON.stringify({
+                  name: 'default',
+                  strategy: 'weighted_rr',
+                  channel_ids: channelIDs,
+                  enabled: true,
+                })})
+              } else {
+                const merged = Array.from(new Set([...(def.channel_ids || []), ...channelIDs])).map(Number)
+                await api('/pools/' + def.id, { method: 'PUT', body: JSON.stringify({
+                  name: def.name,
+                  strategy: def.strategy || 'weighted_rr',
+                  channel_ids: merged,
+                  enabled: def.enabled !== false,
+                })})
+              }
+
+              const rules = await api('/rules') || []
+              const hasDefaultRule = rules.some(r => {
+                try {
+                  const m = r.match_json || {}
+                  return Object.keys(m).length === 0 && Number(r.pool_id) === Number(def.id)
+                } catch { return false }
+              })
+              if (!hasDefaultRule) {
+                await api('/rules', { method: 'POST', body: JSON.stringify({
+                  priority: 9999,
+                  match_json: {},
+                  pool_id: Number(def.id),
+                  fallback_pool_id: null,
+                  enabled: true,
+                })})
+              }
+
+              render()
+            }
+          } else {
+            $('p_create').onclick = async () => {
+              const hdrs = $('p_hdrs').value.trim()
+              const mm = $('p_modelmap').value.trim()
+              await api('/providers', { method: 'POST', body: JSON.stringify({
+                type: $('p_type').value.trim(),
+                base_url: $('p_base').value.trim(),
+                default_headers_json: hdrs ? JSON.parse(hdrs) : null,
+                model_map_json: mm ? JSON.parse(mm) : null,
+                enabled: $('p_enabled').checked,
+              })})
+              render()
+            }
+            document.querySelectorAll('[data-manage-provider]').forEach(btn => btn.onclick = async () => {
+              state.providerDetailId = Number(btn.dataset.manageProvider)
+              render()
+            })
+
+            const filter = $('p_filter')
+            const clearBtn = $('p_filter_clear')
+            const apply = () => {
+              const q = (filter.value || '').trim().toLowerCase()
+              document.querySelectorAll('tbody tr').forEach(tr => {
+                const text = tr.innerText.toLowerCase()
+                tr.style.display = q && !text.includes(q) ? 'none' : ''
+              })
+            }
+            filter.oninput = apply
+            clearBtn.onclick = () => { filter.value = ''; apply() }
+          }
+          document.querySelectorAll('[data-del-provider]').forEach(btn => btn.onclick = async () => {
+            await api('/providers/' + btn.dataset.delProvider, { method: 'DELETE' })
+            state.providerDetailId = 0
+            render()
+          })
+        }
+        if (state.active === 'channels') {
+          $('ch_create').onclick = async () => {
+            const mm = $('ch_modelmap').value.trim()
+            const hdrs = $('ch_hdrs').value.trim()
+            await api('/channels', { method: 'POST', body: JSON.stringify({
+              credential_id: Number($('ch_cid').value),
+              name: $('ch_name').value.trim(),
+              model_map_json: mm ? JSON.parse(mm) : null,
+              extra_headers_json: hdrs ? JSON.parse(hdrs) : null,
+              enabled: $('ch_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-channel]').forEach(btn => btn.onclick = async () => {
+            await api('/channels/' + btn.dataset.delChannel, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'pools') {
+          $('pl_create').onclick = async () => {
+            const ids = $('pl_channels').value.split(',').map(x => x.trim()).filter(Boolean).map(Number)
+            await api('/pools', { method: 'POST', body: JSON.stringify({
+              name: $('pl_name').value.trim(),
+              strategy: $('pl_strategy').value.trim(),
+              channel_ids: ids,
+              enabled: $('pl_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-pool]').forEach(btn => btn.onclick = async () => {
+            await api('/pools/' + btn.dataset.delPool, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'rules') {
+          $('r_create').onclick = async () => {
+            const fb = $('r_fallback').value.trim()
+            const match = $('r_match').value.trim()
+            await api('/rules', { method: 'POST', body: JSON.stringify({
+              priority: Number($('r_priority').value),
+              match_json: match ? JSON.parse(match) : {},
+              pool_id: Number($('r_pool').value),
+              fallback_pool_id: fb ? Number(fb) : null,
+              enabled: $('r_enabled').checked,
+            })})
+            render()
+          }
+          document.querySelectorAll('[data-del-rule]').forEach(btn => btn.onclick = async () => {
+            await api('/rules/' + btn.dataset.delRule, { method: 'DELETE' })
+            render()
+          })
+        }
+        if (state.active === 'logs') {
+          const box = $('logbox')
+          const token = state.token.trim()
+          if (!token) {
+            box.innerHTML = '<div class="logline">需要先设置 ADMIN_TOKEN</div>'
+            return
+          }
+          if (state.es) state.es.close()
+          const url = '/admin/api/logs/stream?token=' + encodeURIComponent(token)
+          const es = new EventSource(url, { withCredentials: false })
+          state.es = es
+          es.onmessage = () => {}
+          es.addEventListener('log', (ev) => {
+            try {
+              const obj = JSON.parse(ev.data)
+              const line = `[${obj.ts}] ${obj.facade} 模型=${obj.model} 供应商=${obj.provider_type} 渠道池=${obj.pool_id} 渠道=${obj.channel_id} 状态=${obj.status} 耗时=${obj.latency_ms}ms ${obj.error || ''}`
+              const div = document.createElement('div')
+              div.className = 'logline'
+              div.textContent = line
+              box.appendChild(div)
+              while (box.childNodes.length > 200) box.removeChild(box.firstChild)
+              box.scrollTop = box.scrollHeight
+            } catch {}
+          })
+          es.onerror = () => {
+            const div = document.createElement('div')
+            div.className = 'logline'
+            div.textContent = '[错误] SSE 连接已断开'
+            box.appendChild(div)
+          }
+        }
+      }
+
+      $('saveToken').onclick = () => {
+        state.token = $('token').value.trim()
+        localStorage.setItem('cg.adminToken', state.token)
+        render()
+      }
+      $('refreshAll').onclick = () => render()
+      $('token').value = state.token
+
+      render()
+    </script>
+  </body>
+</html>

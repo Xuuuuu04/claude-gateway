@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Gateway Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [v-cloak] { display: none; }
+        .json-pre { font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 12px; }
+        .log-error { color: #ef4444; }
+        .log-success { color: #10b981; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+<div id="app" v-cloak class="min-h-screen flex flex-col">
+    <!-- Nav -->
+    <nav class="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-50">
+        <div class="flex items-center space-x-8">
+            <h1 class="text-xl font-bold tracking-tight text-blue-600">Gateway Admin</h1>
+            <div class="flex space-x-1">
+                <button v-for="t in tabs" :key="t.key" @click="currentTab = t.key"
+                        :class="['px-4 py-2 rounded-md text-sm font-medium transition-colors', currentTab === t.key ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100']">
+                    {{ t.name }}
+                </button>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xs text-gray-400 font-mono">{{ status }}</span>
+            <button @click="logout" class="text-sm text-red-500 hover:text-red-700">退出</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
+        <!-- Login -->
+        <div v-if="!token" class="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-xl border">
+            <h2 class="text-2xl font-bold mb-6 text-center">管理员登录</h2>
+            <input v-model="loginToken" type="password" placeholder="Admin Token" @keyup.enter="saveToken"
+                   class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mb-4">
+            <button @click="saveToken" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-all">登录</button>
+        </div>
+
+        <div v-else>
+            <!-- Pools -->
+            <section v-if="currentTab === 'pools'">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">渠道池管理 (入口 Key)</h2>
+                    <button @click="editPool()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700">+ 新建池子</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="p in pools" :key="p.id" class="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">{{ p.name }}</h3>
+                                <div class="mt-1 flex items-center space-x-2">
+                                    <span class="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">ID: {{ p.id }}</span>
+                                    <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider', p.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+                                        {{ p.enabled ? '已启用' : '禁用' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button @click="editPool(p)" class="text-blue-500 hover:text-blue-700 text-sm">编辑</button>
+                                <button @click="deleteItem('pools', p.id)" class="text-red-400 hover:text-red-600 text-sm">删除</button>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-[10px] text-gray-400 uppercase font-bold">Client Key</label>
+                                <div class="flex items-center space-x-2">
+                                    <code class="text-sm bg-blue-50 text-blue-700 px-2 py-1 rounded flex-1 truncate">{{ p.client_key }}</code>
+                                    <button @click="copy(p.client_key)" class="text-gray-400 hover:text-gray-600"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">调度策略:</span>
+                                <span class="font-medium text-gray-700">{{ p.strategy }}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">绑定凭据:</span>
+                                <span class="font-bold text-blue-600">{{ p.credential_ids.length }} 个</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Providers -->
+            <section v-if="currentTab === 'providers'">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">供应商配置</h2>
+                    <button @click="editProvider()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700">+ 新建供应商</button>
+                </div>
+                <div class="overflow-hidden bg-white shadow-sm border rounded-xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">ID</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">类型</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">端点 (Base URL)</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase">模型映射</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr v-for="p in providers" :key="p.id" class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-mono text-sm text-gray-500">{{ p.id }}</td>
+                                <td class="px-6 py-4"><span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-bold uppercase">{{ p.type }}</span></td>
+                                <td class="px-6 py-4 text-sm font-mono truncate max-w-xs">{{ p.base_url }}</td>
+                                <td class="px-6 py-4 text-xs text-gray-400 italic">
+                                    {{ Object.keys(JSON.parse(p.model_map_json || '{}')).length }} 项映射
+                                </td>
+                                <td class="px-6 py-4 text-right space-x-3">
+                                    <button @click="manageCredentials(p)" class="text-green-600 hover:text-green-800 text-sm font-bold">凭据管理</button>
+                                    <button @click="editProvider(p)" class="text-blue-500 hover:text-blue-700 text-sm">编辑</button>
+                                    <button @click="deleteItem('providers', p.id)" class="text-red-400 hover:text-red-600 text-sm">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Monitoring -->
+            <section v-if="currentTab === 'logs'" class="flex flex-col h-[calc(100vh-140px)]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">结构化持久化监控</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 text-sm">
+                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            <span class="text-gray-500">实时更新中</span>
+                        </div>
+                        <button @click="fetchLogs" class="bg-white border px-3 py-1 rounded text-sm hover:bg-gray-50">刷新历史</button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 border-b sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 font-bold text-gray-500">时间</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">池子/Key</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">请求模型</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">上游模型</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">状态</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">延迟</th>
+                                    <th class="px-4 py-3 font-bold text-gray-500">错误</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y font-mono">
+                                <tr v-for="l in logs" :key="l.id || l.ts" :class="l.status >= 400 ? 'bg-red-50' : ''">
+                                    <td class="px-4 py-2 text-xs text-gray-400">{{ formatTime(l.ts || l.created_at) }}</td>
+                                    <td class="px-4 py-2">
+                                        <div class="font-bold text-gray-700">{{ getPoolName(l.pool_id) }}</div>
+                                        <div class="text-[10px] text-gray-400 truncate w-32">...{{ l.client_key.slice(-8) }}</div>
+                                    </td>
+                                    <td class="px-4 py-2 text-blue-600">{{ l.request_model || l.model }}</td>
+                                    <td class="px-4 py-2 text-purple-600">{{ l.upstream_model || '-' }}</td>
+                                    <td class="px-4 py-2">
+                                        <span :class="['px-2 py-0.5 rounded text-[10px] font-bold', l.status < 400 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+                                            {{ l.status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-gray-500">{{ l.latency_ms }}ms</td>
+                                    <td class="px-4 py-2 text-red-500 text-xs truncate max-w-xs">{{ l.error }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div v-if="modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+        <!-- Pool Modal -->
+        <div v-if="modal === 'pool'" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="font-bold text-xl">{{ form.id ? '编辑池子' : '新建池子' }}</h3>
+                <button @click="modal = null" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">名称</label>
+                        <input v-model="form.name" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">策略</label>
+                        <select v-model="form.strategy" class="w-full px-3 py-2 border rounded-lg outline-none">
+                            <option value="weighted_rr">加权轮询 (Weighted RR)</option>
+                            <option value="least_inflight">最少并发 (Least Inflight)</option>
+                            <option value="priority_failover">优先级故障转移</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Client Key (API Key)</label>
+                    <div class="flex space-x-2">
+                        <input v-model="form.client_key" class="flex-1 px-3 py-2 border rounded-lg font-mono text-sm" placeholder="sk-...">
+                        <button @click="form.client_key = 'sk-' + Math.random().toString(36).slice(2, 18)" class="text-xs text-blue-600">随机生成</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">绑定凭据 (Credentials)</label>
+                    <div class="border rounded-lg overflow-hidden">
+                        <div v-for="p in providersWithCreds" :key="p.id" class="border-b last:border-0">
+                            <div class="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500">{{ p.type }} - {{ p.base_url }}</div>
+                            <div class="p-2 grid grid-cols-2 gap-2">
+                                <label v-for="c in p.creds" :key="c.id" class="flex items-center space-x-2 p-1.5 border rounded hover:bg-blue-50 cursor-pointer">
+                                    <input type="checkbox" v-model="form.credential_ids" :value="c.id" class="rounded text-blue-600">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-xs font-bold truncate">{{ c.name }}</div>
+                                        <div class="text-[10px] text-gray-400 font-mono">****{{ c.key_last4 }}</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">模型映射 (JSON)</label>
+                    <textarea v-model="form.model_map_json" rows="4" class="w-full px-3 py-2 border rounded-lg font-mono text-xs" placeholder='{"gpt-4": "claude-3-opus"}'></textarea>
+                </div>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" v-model="form.enabled" class="rounded text-blue-600">
+                    <span class="text-sm font-bold">启用此池子</span>
+                </label>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
+                <button @click="modal = null" class="px-4 py-2 text-gray-600">取消</button>
+                <button @click="savePool" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">保存</button>
+            </div>
+        </div>
+
+        <!-- Provider Modal -->
+        <div v-if="modal === 'provider'" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                <h3 class="font-bold text-xl">{{ form.id ? '编辑供应商' : '新建供应商' }}</h3>
+                <button @click="modal = null" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">类型</label>
+                        <select v-model="form.type" class="w-full px-3 py-2 border rounded-lg outline-none">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">启用</label>
+                        <select v-model="form.enabled" class="w-full px-3 py-2 border rounded-lg outline-none">
+                            <option :value="true">启用</option>
+                            <option :value="false">禁用</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">端点 (Base URL)</label>
+                    <input v-model="form.base_url" placeholder="https://api.openai.com/v1" class="w-full px-3 py-2 border rounded-lg outline-none font-mono text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">默认请求头 (JSON)</label>
+                    <textarea v-model="form.default_headers_json" rows="3" class="w-full px-3 py-2 border rounded-lg font-mono text-xs"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">模型映射 (JSON)</label>
+                    <textarea v-model="form.model_map_json" rows="3" class="w-full px-3 py-2 border rounded-lg font-mono text-xs"></textarea>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t flex justify-end space-x-3">
+                <button @click="modal = null" class="px-4 py-2 text-gray-600">取消</button>
+                <button @click="saveProvider" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">保存</button>
+            </div>
+        </div>
+
+        <!-- Credentials Modal -->
+        <div v-if="modal === 'credentials'" class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden">
+            <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-xl">凭据管理: {{ activeProvider.type }}</h3>
+                    <p class="text-xs text-gray-400">{{ activeProvider.base_url }}</p>
+                </div>
+                <button @click="modal = null" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div class="p-6 flex space-x-6 h-[60vh]">
+                <!-- List -->
+                <div class="flex-1 flex flex-col">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h4 class="font-bold text-sm text-gray-500 uppercase">已有凭据</h4>
+                        <span class="text-xs text-gray-400">{{ activeCredentials.length }} 项</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto border rounded-lg divide-y">
+                        <div v-for="c in activeCredentials" :key="c.id" class="p-3 hover:bg-gray-50 flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-sm">{{ c.name }}</div>
+                                <div class="text-[10px] text-gray-400 font-mono">****{{ c.key_last4 }} | 权重: {{ c.weight }} | 并发: {{ c.concurrency_limit || '无' }}</div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <button @click="editCredential(c)" class="text-blue-500 text-xs">编辑</button>
+                                <button @click="deleteItem('credentials', c.id)" class="text-red-400 text-xs">删除</button>
+                            </div>
+                        </div>
+                        <div v-if="!activeCredentials.length" class="p-10 text-center text-gray-400 text-sm">暂无凭据</div>
+                    </div>
+                </div>
+                <!-- Form -->
+                <div class="w-80 space-y-4 bg-gray-50 p-4 rounded-xl border">
+                    <h4 class="font-bold text-sm">{{ credForm.id ? '修改凭据' : '添加/批量添加' }}</h4>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">名称/批量</label>
+                        <input v-if="!credForm.id" v-model="credForm.name" placeholder="名称 (批量导入请留空)" class="w-full px-3 py-2 border rounded text-sm">
+                        <input v-else v-model="credForm.name" class="w-full px-3 py-2 border rounded text-sm">
+                    </div>
+                    <div v-if="!credForm.id">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">API Key(s) (一行一个即为批量)</label>
+                        <textarea v-model="credForm.api_key" rows="6" class="w-full px-3 py-2 border rounded font-mono text-xs" placeholder="sk-...\nsk-..."></textarea>
+                    </div>
+                    <div v-else>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase">重置 API Key (留空不改)</label>
+                        <input v-model="credForm.api_key" class="w-full px-3 py-2 border rounded font-mono text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase">权重</label>
+                            <input v-model.number="credForm.weight" type="number" class="w-full px-3 py-2 border rounded text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase">并发限制</label>
+                            <input v-model.number="credForm.concurrency_limit" type="number" class="w-full px-3 py-2 border rounded text-sm">
+                        </div>
+                    </div>
+                    <button @click="saveCredential" class="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">
+                        {{ credForm.id ? '保存修改' : (credForm.api_key.includes('\n') ? '批量导入' : '立即添加') }}
+                    </button>
+                    <button v-if="credForm.id" @click="resetCredForm" class="w-full text-xs text-gray-500">取消编辑</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted, computed, watch } = Vue;
+
+createApp({
+    setup() {
+        const token = ref(localStorage.getItem('admin_token') || '');
+        const loginToken = ref('');
+        const currentTab = ref('pools');
+        const tabs = [
+            { key: 'pools', name: '渠道池/入口' },
+            { key: 'providers', name: '供应商' },
+            { key: 'logs', name: '实时监控' }
+        ];
+
+        const pools = ref([]);
+        const providers = ref([]);
+        const credentials = ref([]);
+        const logs = ref([]);
+        const status = ref('已连接');
+
+        const modal = ref(null);
+        const form = ref({});
+        const activeProvider = ref(null);
+        const activeCredentials = ref([]);
+        const credForm = ref({ weight: 1, concurrency_limit: 0, enabled: true });
+
+        const api = async (path, opt = {}) => {
+            opt.headers = { ...opt.headers, 'Authorization': 'Bearer ' + token.value };
+            const resp = await fetch('/admin/api' + path, opt);
+            if (resp.status === 401) { logout(); throw 'unauthorized'; }
+            if (resp.status === 204) return null;
+            const data = await resp.json();
+            if (!resp.ok) throw data.error || 'API Error';
+            return data;
+        };
+
+        const fetchAll = async () => {
+            if (!token.value) return;
+            try {
+                const [p, pr, cr] = await Promise.all([api('/pools'), api('/providers'), api('/credentials')]);
+                pools.value = p;
+                providers.value = pr;
+                credentials.value = cr;
+            } catch (e) { console.error(e); }
+        };
+
+        const fetchLogs = async () => {
+            try { logs.value = await api('/logs'); } catch(e){}
+        };
+
+        const providersWithCreds = computed(() => {
+            return providers.value.map(p => ({
+                ...p,
+                creds: credentials.value.filter(c => c.provider_id === p.id)
+            }));
+        });
+
+        // SSE
+        let es = null;
+        const startSSE = () => {
+            if (es) es.close();
+            es = new EventSource('/admin/api/logs/stream?token=' + token.value);
+            es.onmessage = (e) => {
+                const ev = JSON.parse(e.data);
+                logs.value.unshift(ev);
+                if (logs.value.length > 200) logs.value.pop();
+            };
+            es.onerror = () => { status.value = '重连中...'; };
+            es.onopen = () => { status.value = '已连接'; };
+        };
+
+        // Pool
+        const editPool = (p) => {
+            form.value = p ? JSON.parse(JSON.stringify(p)) : { name: '', client_key: 'sk-' + Math.random().toString(36).slice(2, 10), strategy: 'weighted_rr', credential_ids: [], model_map_json: '{}', enabled: true };
+            if (typeof form.value.model_map_json !== 'string') form.value.model_map_json = JSON.stringify(form.value.model_map_json, null, 2);
+            modal.value = 'pool';
+        };
+        const savePool = async () => {
+            const body = { ...form.value, model_map_json: JSON.parse(form.value.model_map_json || '{}') };
+            const method = body.id ? 'PUT' : 'POST';
+            const url = body.id ? '/pools/' + body.id : '/pools';
+            await api(url, { method, body: JSON.stringify(body) });
+            modal.value = null; fetchAll();
+        };
+
+        // Provider
+        const editProvider = (p) => {
+            form.value = p ? JSON.parse(JSON.stringify(p)) : { type: 'openai', base_url: '', default_headers_json: '{}', model_map_json: '{}', enabled: true };
+            ['default_headers_json', 'model_map_json'].forEach(k => {
+                if (typeof form.value[k] !== 'string') form.value[k] = JSON.stringify(form.value[k] || {}, null, 2);
+            });
+            modal.value = 'provider';
+        };
+        const saveProvider = async () => {
+            const body = { ...form.value };
+            ['default_headers_json', 'model_map_json'].forEach(k => { body[k] = JSON.parse(body[k] || '{}'); });
+            const method = body.id ? 'PUT' : 'POST';
+            const url = body.id ? '/providers/' + body.id : '/providers';
+            await api(url, { method, body: JSON.stringify(body) });
+            modal.value = null; fetchAll();
+        };
+
+        // Credentials
+        const manageCredentials = async (p) => {
+            activeProvider.value = p;
+            activeCredentials.value = credentials.value.filter(c => c.provider_id === p.id);
+            resetCredForm();
+            modal.value = 'credentials';
+        };
+        const resetCredForm = () => {
+            credForm.value = { provider_id: activeProvider.value.id, weight: 1, concurrency_limit: 0, enabled: true, name: '', api_key: '' };
+        };
+        const editCredential = (c) => {
+            credForm.value = JSON.parse(JSON.stringify(c));
+            credForm.value.api_key = '';
+        };
+        const saveCredential = async () => {
+            if (!credForm.value.id && credForm.value.api_key.includes('\n')) {
+                const keys = credForm.value.api_key.split('\n').map(k => k.trim()).filter(k => k);
+                const items = keys.map((k, i) => ({
+                    name: credForm.value.name || (activeProvider.value.type + '-' + (i+1)),
+                    api_key: k,
+                    weight: credForm.value.weight,
+                    concurrency_limit: credForm.value.concurrency_limit,
+                    enabled: true
+                }));
+                await api('/credentials/bulk', { method: 'POST', body: JSON.stringify({ provider_id: activeProvider.value.id, items }) });
+            } else {
+                const method = credForm.value.id ? 'PUT' : 'POST';
+                const url = credForm.value.id ? '/credentials/' + credForm.value.id : '/credentials';
+                await api(url, { method, body: JSON.stringify(credForm.value) });
+            }
+            const cr = await api('/credentials'); credentials.value = cr;
+            activeCredentials.value = credentials.value.filter(c => c.provider_id === activeProvider.value.id);
+            resetCredForm();
+        };
+
+        const deleteItem = async (type, id) => {
+            if (!confirm('确定删除吗?')) return;
+            await api('/' + type + '/' + id, { method: 'DELETE' });
+            fetchAll();
+            if (type === 'credentials' && activeProvider.value) {
+                activeCredentials.value = activeCredentials.value.filter(c => c.id !== id);
+            }
+        };
+
+        const saveToken = () => { token.value = loginToken.value; localStorage.setItem('admin_token', token.value); fetchAll(); };
+        const logout = () => { token.value = ''; localStorage.removeItem('admin_token'); if(es) es.close(); };
+        const copy = (txt) => { navigator.clipboard.writeText(txt); alert('已复制'); };
+        const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+        const getPoolName = (id) => pools.value.find(p => p.id === id)?.name || id;
+
+        watch(currentTab, (v) => { if(v === 'logs') { startSSE(); fetchLogs(); } else if(es) es.close(); });
+        onMounted(() => { if(token.value) { fetchAll(); if(currentTab.value==='logs') startSSE(); } });
+
+        return {
+            token, loginToken, saveToken, logout, tabs, currentTab,
+            pools, providers, credentials, logs, status, modal, form, activeProvider, activeCredentials, credForm,
+            fetchAll, fetchLogs, providersWithCreds, editPool, savePool, editProvider, saveProvider,
+            manageCredentials, resetCredForm, editCredential, saveCredential, deleteItem,
+            copy, formatTime, getPoolName
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>

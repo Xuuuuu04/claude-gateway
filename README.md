@@ -14,7 +14,7 @@
 启动：
 
 ```bash
-go run ./cmd/gateway
+go run ./src/cmd/gateway
 ```
 
 ## Claude Code 接入（思路）

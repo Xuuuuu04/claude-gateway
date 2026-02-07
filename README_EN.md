@@ -7,10 +7,10 @@ Multi-provider model gateway with unified API facades, routing policies, and an 
 - English: [README_EN](./README_EN.md)
 
 ## Project Structure
-Entry: cmd/gateway; Core modules: internal/; Docs: docs/PROJECT_STRUCTURE.md
+Entry: src/cmd/gateway; Core modules: src/internal/; Docs: docs/PROJECT_STRUCTURE.md
 
 ## Quick Start
-go run ./cmd/gateway
+go run ./src/cmd/gateway
 
 ## Source Directory
 - Unified source entry: [src](./src)

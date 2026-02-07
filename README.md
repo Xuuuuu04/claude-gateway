@@ -28,4 +28,8 @@ Claude Code 支持通过 `ANTHROPIC_BASE_URL` 指向兼容 Anthropic Messages AP
 
 ## 部署
 
-见 [DEPLOY.md](file:///Users/xushaoyang/Desktop/Claude负载与反代/docs/DEPLOY.md)。
+见 `docs/DEPLOY.md`。
+
+## 开发进度（截至 2026-02-07）
+- 当前开发进度与已知风险：`docs/PROJECT_STATUS.md`
+- 本仓库以可公开协作为目标维护，功能清单与后续计划以状态文档为准并持续更新。

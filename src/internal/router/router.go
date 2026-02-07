@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"claude-gateway/internal/crypto"
-	"claude-gateway/internal/metrics"
+	"claude-gateway/src/internal/crypto"
+	"claude-gateway/src/internal/metrics"
 )
 
 var ErrNotConfigured = errors.New("gateway not configured")

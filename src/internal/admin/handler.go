@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"claude-gateway/internal/crypto"
-	"claude-gateway/internal/logbus"
-	"claude-gateway/internal/metrics"
-	"claude-gateway/internal/router"
+	"claude-gateway/src/internal/crypto"
+	"claude-gateway/src/internal/logbus"
+	"claude-gateway/src/internal/metrics"
+	"claude-gateway/src/internal/router"
 )
 
 //go:embed web/*

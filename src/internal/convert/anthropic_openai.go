@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	anthropicproto "claude-gateway/internal/proto/anthropic"
-	openaiproto "claude-gateway/internal/proto/openai"
+	anthropicproto "claude-gateway/src/internal/proto/anthropic"
+	openaiproto "claude-gateway/src/internal/proto/openai"
 )
 
 var ErrUnsupportedMessageShape = errors.New("unsupported message shape")

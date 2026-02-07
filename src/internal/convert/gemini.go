@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	anthropicproto "claude-gateway/internal/proto/anthropic"
-	openaiproto "claude-gateway/internal/proto/openai"
+	anthropicproto "claude-gateway/src/internal/proto/anthropic"
+	openaiproto "claude-gateway/src/internal/proto/openai"
 )
 
 func AnthropicToGeminiRequest(ar anthropicproto.MessageCreateRequest) (GeminiGenerateContentRequest, string) {

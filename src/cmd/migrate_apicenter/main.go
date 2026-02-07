@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"claude-gateway/internal/crypto"
-	"claude-gateway/internal/db"
+	"claude-gateway/src/internal/crypto"
+	"claude-gateway/src/internal/db"
 )
 
 type channelRow struct {

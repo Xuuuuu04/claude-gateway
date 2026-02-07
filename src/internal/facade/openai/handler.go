@@ -15,16 +15,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"claude-gateway/internal/canonical"
-	"claude-gateway/internal/convert"
-	"claude-gateway/internal/logbus"
-	"claude-gateway/internal/metrics"
-	openaiproto "claude-gateway/internal/proto/openai"
-	anthropicProvider "claude-gateway/internal/providers/anthropic"
-	geminiProvider "claude-gateway/internal/providers/gemini"
-	"claude-gateway/internal/providers/openai"
-	"claude-gateway/internal/router"
-	"claude-gateway/internal/streamconv"
+	"claude-gateway/src/internal/canonical"
+	"claude-gateway/src/internal/convert"
+	"claude-gateway/src/internal/logbus"
+	"claude-gateway/src/internal/metrics"
+	openaiproto "claude-gateway/src/internal/proto/openai"
+	anthropicProvider "claude-gateway/src/internal/providers/anthropic"
+	geminiProvider "claude-gateway/src/internal/providers/gemini"
+	"claude-gateway/src/internal/providers/openai"
+	"claude-gateway/src/internal/router"
+	"claude-gateway/src/internal/streamconv"
 )
 
 type Handler struct {

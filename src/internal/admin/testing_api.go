@@ -17,10 +17,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"claude-gateway/internal/logbus"
-	anthropicProvider "claude-gateway/internal/providers/anthropic"
+	"claude-gateway/src/internal/logbus"
+	anthropicProvider "claude-gateway/src/internal/providers/anthropic"
 
-	openaiProvider "claude-gateway/internal/providers/openai"
+	openaiProvider "claude-gateway/src/internal/providers/openai"
 )
 
 type providerModelsResponse struct {

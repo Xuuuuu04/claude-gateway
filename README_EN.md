@@ -1,12 +1,20 @@
-# claude-gateway
+# Claude Gateway
+
+Multi-provider model gateway with unified API facades, routing policies, and an admin panel.
 
 ## Language
-- 中文: [README](./README.md)
+- Chinese: [README](./README.md)
 - English: [README_EN](./README_EN.md)
+
+## Project Structure
+Entry: cmd/gateway; Core modules: internal/; Docs: docs/PROJECT_STRUCTURE.md
+
+## Quick Start
+go run ./cmd/gateway
 
 ## Source Directory
 - Unified source entry: [src](./src)
 
-## Structure Guide
-- Put executable/business code under `src/`.
-- Keep docs under `docs/` (or `doc/`).
+## Development Status
+- This repository is maintained for open-source collaboration.
+- Progress is tracked via commits and issues.

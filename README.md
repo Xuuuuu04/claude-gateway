@@ -41,3 +41,6 @@ Claude Code 支持通过 `ANTHROPIC_BASE_URL` 指向兼容 Anthropic Messages AP
 
 ## 统一源码目录
 - 源码入口：[`src/`](./src)
+
+## 目录结构
+- 结构说明：[`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md)

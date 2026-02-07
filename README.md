@@ -44,3 +44,7 @@ Claude Code 支持通过 `ANTHROPIC_BASE_URL` 指向兼容 Anthropic Messages AP
 
 ## 目录结构
 - 结构说明：[`docs/PROJECT_STRUCTURE.md`](./docs/PROJECT_STRUCTURE.md)
+
+## 迁移说明
+- 核心目录已迁移到 `src/` 下。
+- 根目录保留兼容软链接，历史命令与路径可继续使用。
